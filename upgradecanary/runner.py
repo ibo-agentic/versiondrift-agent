@@ -36,8 +36,9 @@ def build_prompt(task: Task, schema: dict[str, Any]) -> str:
     return (
         "You are an agent that answers questions by calling tools.\n"
         f"Available tool schema:\n{tool_json}\n"
-        'Reply with a single JSON object of the form '
-        '{"name": <tool name>, "arguments": {<args>}}.\n'
+        "Reply with ONLY a single JSON object of the form "
+        '{"name": <tool name>, "arguments": {<args>}}. '
+        "No markdown fences, no explanation, no text before or after the JSON.\n"
         f"Question: {task.prompt}\n"
         "Answer:"
     )
@@ -71,6 +72,10 @@ def run(config_path: str) -> dict[str, Any]:
     out_dir = Path(cfg["output_dir"]) / rid
 
     tasks = load_tasks(cfg["data"])
+    task_limit = cfg.get("task_limit")
+    if task_limit is not None:
+        tasks = tasks[: int(task_limit)]
+
     client = create_client(cfg["model"])
 
     drift_enabled = cfg["perturbations"]["schema_drift"].get("enabled", [])

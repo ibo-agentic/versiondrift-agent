@@ -124,23 +124,40 @@ rebuild it deterministically:
 python scripts/generate_tasks.py
 ```
 
-## Using a real local model (optional, manual step)
+## Real-model smoke test (optional, manual steps)
 
-This project never downloads models for you.
+This project never downloads models or installs inference backends for you.
 
-1. Download a 4-bit GGUF that fits 8GB VRAM, e.g. **Qwen2.5-7B-Instruct-Q4_K_M**
-   (~4.7 GB) or **Llama-3.1-8B-Instruct-Q4_K_M**, from Hugging Face.
-2. Place the file under `models/`.
-3. In `configs/pilot.yaml` set `model.provider: llama_cpp` and point
-   `model.path` at the file.
+1. Install the backend (RTX 4060 — prebuilt CUDA wheel):
+   `pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124`
+   (CPU-only: plain `pip install llama-cpp-python`.)
+2. Download **mistral-7b-instruct-v0.2.Q4_K_M.gguf** (or another 4-bit GGUF that
+   fits 8GB, e.g. Qwen2.5-7B-Instruct-Q4_K_M) from Hugging Face and place it
+   under `models/` — the filename must match `model.path` in the config
+   (`models/mistral-7b-instruct-v0.2.Q4_K_M.gguf`).
+3. Run the smoke config (first 10 tasks only, greedy decoding, seed fixed):
 
-Note: llama.cpp seeding is best-effort on GPU; for strict byte-identical
-reruns use the mock provider or CPU. `temperature: 0.0` is already set.
+   ```bash
+   python -m upgradecanary.runner --config configs/real_smoke_v0.2.yaml
+   ```
+
+**If CUDA runs out of memory:** lower `n_ctx` in `configs/real_smoke_v0.2.yaml`
+(2048 → 1024). A Q4_K_M 7B model uses ~4.2GB, so context is the first knob to
+turn; `n_gpu_layers: -1` offloads all layers and is silently ignored by
+CPU-only builds.
+
+**Prompt format caveat:** the runner sends a plain-text prompt (tool schema +
+JSON-only instruction + question). Instruct models usually expect their chat
+template (`[INST]…[/INST]` for Mistral) — if the smoke run yields prose
+instead of JSON, wrapping the prompt in the model's template is the first
+thing to add. llama.cpp seeding is best-effort on GPU; for byte-identical
+reruns use the mock provider.
 
 ## Project layout
 
 ```
 configs/pilot.yaml          pilot configuration (seed, conditions, perturbations)
+configs/real_smoke_v0.2.yaml  real-model smoke config (first 10 tasks, llama_cpp)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 scripts/generate_tasks.py   deterministic task-file generator
 tests/                      pytest suite (python -m pytest -q)

@@ -28,10 +28,11 @@ class LlamaCppClient:
             )
 
         # -1 puts all layers on the GPU; a Q4_K_M 7-8B model fits comfortably in 8GB.
+        # CPU-only llama-cpp-python builds simply ignore n_gpu_layers.
         self._llm = Llama(
             model_path=path,
             n_ctx=int(model_cfg.get("n_ctx", 4096)),
-            n_gpu_layers=-1,
+            n_gpu_layers=int(model_cfg.get("n_gpu_layers", -1)),
             seed=int(model_cfg.get("seed", 0)),
             verbose=False,
         )

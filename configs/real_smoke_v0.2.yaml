@@ -1,0 +1,33 @@
+# Real-model smoke test config (v0.2).
+# Prerequisites (manual — this project never downloads or installs for you):
+#   1. pip install llama-cpp-python   (see README; CUDA wheel for the RTX 4060)
+#   2. Place the GGUF file at: models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+# Do NOT run this config until both steps are done.
+
+experiment: upgradecanary-real-smoke-v0.2
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+task_limit: 10              # smoke scope: first 10 tasks only
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+model:
+  provider: llama_cpp
+  path: models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+  n_ctx: 2048               # modest context; Q4_K_M 7B + KV cache fit in 8GB
+  n_gpu_layers: -1          # all layers on GPU; ignored by CPU-only builds
+  temperature: 0.0          # greedy decoding
+  max_tokens: 256
+  seed: 1234                # llama.cpp seeding is best-effort on GPU (see README)
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true
