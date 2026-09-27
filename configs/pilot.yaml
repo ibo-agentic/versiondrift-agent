@@ -1,0 +1,40 @@
+# UpgradeCanary pilot experiment configuration.
+# Everything here is local: no external APIs, no automatic model downloads.
+
+experiment: upgradecanary-pilot
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+
+# Conditions form the task x condition evaluation matrix.
+conditions: [baseline, schema_drift, runtime_fault]
+
+model:
+  provider: mock            # mock | llama_cpp
+  # Path to a GGUF file YOU place under models/. Never downloaded by this project.
+  path: models/qwen2.5-7b-instruct-q4_k_m.gguf
+  n_ctx: 4096
+  temperature: 0.0          # deterministic decoding
+  max_tokens: 512
+  seed: 1234                # passed to llama.cpp (best-effort, see README)
+  mock:
+    # Emit pre-drift (old-schema) arguments under the schema_drift condition,
+    # simulating an agent built against the previous tool version.
+    stale_on_drift: true
+    # On retry after a runtime fault, emit a corrected valid call.
+    recover_after_fault: true
+    # Task ids for which the mock emits unparseable text (tests parse_ok).
+    broken_output_for: []
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true        # give the agent one retry after a retryable fault
+
+executor:
+  # Under drift we tolerate unknown/extra arguments (post-upgrade leniency);
+  # baseline validation is strict.
+  strict_baseline_args: true

@@ -1,0 +1,5 @@
+PyYAML>=6.0
+# Local inference backend for real-model runs. On Windows + RTX 4060 install the
+# prebuilt CUDA wheel (see README "Setup"); for CPU-only, a plain install works.
+llama-cpp-python>=0.2.90
+pytest>=8.0
