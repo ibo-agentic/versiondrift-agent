@@ -173,7 +173,8 @@ use the mock provider.
 ```
 configs/pilot.yaml          pilot configuration (seed, conditions, perturbations)
 configs/real_smoke_v0.2.yaml  real-model smoke config (first 10 tasks, llama_cpp)
-configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, llama_cpp)
+configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, Mistral v0.2)
+configs/real_pilot_v0.3.yaml  real-model pilot config (all 100 tasks, Mistral v0.3)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 scripts/generate_tasks.py   deterministic task-file generator
 tests/                      pytest suite (python -m pytest -q)

@@ -1,0 +1,40 @@
+# Real-model pilot config (v0.3) — full 100-task run, Mistral-7B-Instruct-v0.3.
+# Same settings as real_pilot_v0.2.yaml; only the model path and run name differ.
+# Prerequisites (manual — this project never downloads or installs for you):
+#   1. pip install llama-cpp-python   (see README; CUDA wheel for the RTX 4060)
+#   2. Place the GGUF file at: models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf
+# Do NOT run this config until both steps are done.
+
+experiment: upgradecanary-real-pilot-v0.3
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+# no task_limit: all 100 tasks
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+model:
+  provider: llama_cpp
+  path: models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf
+  n_ctx: 2048               # modest context; Q4_K_M 7B + KV cache fit in 8GB
+  n_gpu_layers: -1          # all layers on GPU; ignored by CPU-only builds
+  temperature: 0.0          # greedy decoding
+  max_tokens: 256
+  seed: 1234                # llama.cpp seeding is best-effort on GPU (see README)
+  # Mistral-Instruct chat template: the raw prompt (tool schema +
+  # JSON-only instruction + question) is inserted at {prompt}.
+  # No leading "<s>" — llama-cpp-python adds BOS automatically; a literal
+  # "<s>" triggers llama.cpp's "duplicate leading <s>" warning.
+  prompt_template: "[INST]\n{prompt}\n[/INST]"
+  stop: ["</s>"]            # safety net; llama.cpp also stops on the model's EOS token
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true
