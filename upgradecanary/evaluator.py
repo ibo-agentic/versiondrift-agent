@@ -110,6 +110,13 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         for key in (*_METRIC_KEYS, "score"):
             vals = [r["metrics"][key] for r in rows if r["metrics"].get(key) is not None]
             entry[f"mean_{key}"] = round(sum(vals) / len(vals), 4) if vals else None
+        trial_indices = sorted({int(r.get("trial_index", 0)) for r in rows})
+        if len(trial_indices) > 1:
+            entry["by_trial"] = {}
+            for t in trial_indices:
+                sub = [r for r in rows if int(r.get("trial_index", 0)) == t]
+                vals = [r["metrics"]["score"] for r in sub]
+                entry["by_trial"][str(t)] = round(sum(vals) / len(vals), 4)
         summary["conditions"][condition] = entry
         if condition == "baseline":
             baseline_score = entry["mean_score"]

@@ -6,6 +6,10 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import pytest
+import yaml
+
+from upgradecanary import runner
 from upgradecanary.evaluator import evaluate
 from upgradecanary.perturbations.schema_drift import (
     apply,
@@ -150,3 +154,75 @@ def test_score_is_functional_not_exact():
     assert metrics["args_valid_under_drift"] is True
     assert metrics["executor_ok"] is True
     assert metrics["score"] == 1.0
+
+
+def _trials_config(tmp_path: Path, out_dir: Path, trials: int) -> Path:
+    cfg = {
+        "experiment": "trials-test",
+        "seed": 1234,
+        "data": str(ROOT / "data" / "base_tasks.jsonl"),
+        "output_dir": str(out_dir),
+        "task_limit": 2,
+        "conditions": ["baseline", "schema_drift", "runtime_fault"],
+        "model": {"provider": "mock", "temperature": 0.0, "seed": 1234},
+        "perturbations": {
+            "schema_drift": {
+                "enabled": ["field_rename", "field_drop", "type_mutation",
+                            "unexpected_field", "enum_drift"]
+            },
+            "runtime_faults": {
+                "enabled": ["timeout", "tool_exception", "empty_result",
+                            "stale_result", "partial_result"],
+                "retry_once": True,
+            },
+        },
+        "executor": {"strict_baseline_args": True},
+    }
+    if trials:
+        cfg["trials"] = trials
+        cfg["trial_temperatures"] = [0.0, 0.7, 0.7][:trials]
+        cfg["trial_seeds"] = [1234, 1235, 1236][:trials]
+    path = tmp_path / f"config_{out_dir.name}.yaml"
+    path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    return path
+
+
+def _load_parsed(out_dir: Path) -> list[dict]:
+    files = list(Path(out_dir).glob("*/parsed_results.jsonl"))
+    assert len(files) == 1, f"expected one run dir, found {files}"
+    return [json.loads(l) for l in files[0].read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
+def test_trials_respected_and_recorded(tmp_path):
+    out = tmp_path / "out"
+    summary = runner.run(str(_trials_config(tmp_path, out, trials=3)))
+    rows = _load_parsed(out)
+    assert len(rows) == 2 * 3 * 3  # 2 tasks x 3 conditions x 3 trials
+    by_pair: dict = {}
+    for r in rows:
+        by_pair.setdefault((r["task_id"], r["condition"]), set()).add(r["trial_index"])
+    assert len(by_pair) == 6
+    assert all(v == {0, 1, 2} for v in by_pair.values())
+    for r in rows:
+        assert r["temperature"] == [0.0, 0.7, 0.7][r["trial_index"]]
+        assert r["seed"] == [1234, 1235, 1236][r["trial_index"]]
+    assert summary["conditions"]["baseline"]["by_trial"] == {"0": 1.0, "1": 1.0, "2": 1.0}
+
+
+def test_trial_runs_are_deterministic(tmp_path):
+    out_a, out_b = tmp_path / "a", tmp_path / "b"
+    runner.run(str(_trials_config(tmp_path, out_a, trials=2)))
+    runner.run(str(_trials_config(tmp_path, out_b, trials=2)))
+    a, b = _load_parsed(out_a), _load_parsed(out_b)
+    assert a == b  # content and ordering identical across reruns
+    keys = [(r["task_id"], r["condition"], r["trial_index"]) for r in a]
+    assert keys == sorted(keys)
+
+
+def test_trial_config_validation():
+    base = {"trials": 3, "model": {"temperature": 0.0, "seed": 1234},
+            "trial_temperatures": [0.0, 0.7], "trial_seeds": [1234, 1235, 1236]}
+    with pytest.raises(ValueError):
+        runner.build_trials(base)
+    ok = runner.build_trials({"trials": 2, "model": {"temperature": 0.0, "seed": 9}})
+    assert ok == [{"temperature": 0.0, "seed": 9}] * 2

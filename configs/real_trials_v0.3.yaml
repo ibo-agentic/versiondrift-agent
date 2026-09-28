@@ -1,0 +1,40 @@
+# Real-model repeated-trials config (v0.3) — 100 tasks x 3 trials.
+# Same model/settings as real_pilot_v0.3.yaml plus repeated trials:
+# trial 0 is greedy (reproducibility anchor), trials 1-2 are sampled at 0.7
+# with distinct seeds (consistency measurement).
+# Prerequisites: llama-cpp-python installed; GGUF at model.path (manual).
+
+experiment: upgradecanary-real-trials-v0.3
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+# no task_limit: all 100 tasks
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 3
+trial_temperatures: [0.0, 0.7, 0.7]
+trial_seeds: [1234, 1235, 1236]
+
+model:
+  provider: llama_cpp
+  path: models/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0          # fallback for trials without explicit temperatures
+  max_tokens: 256
+  seed: 1234
+  # No leading "<s>" — llama-cpp-python adds BOS automatically.
+  prompt_template: "[INST]\n{prompt}\n[/INST]"
+  stop: ["</s>"]
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true

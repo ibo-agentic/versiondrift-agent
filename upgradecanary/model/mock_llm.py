@@ -32,7 +32,16 @@ class MockModelClient:
         self.recover_after_fault: bool = mock_cfg.get("recover_after_fault", True)
         self.broken_output_for: list[str] = list(mock_cfg.get("broken_output_for", []))
 
-    def generate(self, prompt: str, context: dict[str, Any] | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        *,
+        temperature: float | None = None,
+        seed: int | None = None,
+    ) -> str:
+        # temperature/seed are accepted for interface compatibility with real
+        # backends; the mock is fully deterministic and ignores them.
         context = context or {}
         task = context["task"]
         condition = context.get("condition", "baseline")

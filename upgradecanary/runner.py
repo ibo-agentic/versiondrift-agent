@@ -1,10 +1,14 @@
-"""Experiment runner: task x condition matrix -> model -> parse -> execute -> score.
+"""Experiment runner: task x condition x trial -> model -> parse -> execute -> score.
 
-Writes four artifacts per run under results/<run_id>/:
-- run_manifest.json    config snapshot, seed, versions
-- raw_outputs.jsonl    prompt + raw model text (and retry attempt) per record
-- parsed_results.jsonl parsed call, executor outcome, fault/drift, metrics
-- summary.json         per-condition aggregate means and deltas vs baseline
+Each task-condition is repeated for every configured trial (``trials``,
+``trial_temperatures``, ``trial_seeds``; default 1 trial using the model's
+temperature/seed). Writes four artifacts per run under results/<run_id>/:
+- run_manifest.json    config snapshot, seed, versions, trial count
+- raw_outputs.jsonl    prompt + raw model text (and retry attempt) per record,
+                       with trial_index/temperature/seed
+- parsed_results.jsonl parsed call, executor outcome, fault/drift, metrics,
+                       with trial_index/temperature/seed (no volatile fields)
+- summary.json         per-condition aggregate means, per-trial means, deltas
 """
 
 from __future__ import annotations
@@ -63,6 +67,30 @@ def _safe_execute(parsed, schema, drift, fault, strict) -> dict[str, Any]:
         }
 
 
+def build_trials(cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    """Resolve the trial list from config: one {temperature, seed} per trial.
+
+    ``trial_temperatures``/``trial_seeds`` fall back to the model's defaults
+    repeated ``trials`` times; explicit lists must match ``trials`` in length.
+    """
+    n = int(cfg.get("trials", 1))
+    if n < 1:
+        raise ValueError(f"trials must be >= 1, got {n}")
+    model = cfg.get("model", {})
+    temps = cfg.get("trial_temperatures")
+    seeds = cfg.get("trial_seeds")
+    if temps is None:
+        temps = [model.get("temperature", 0.0)] * n
+    if seeds is None:
+        seeds = [model.get("seed", 0)] * n
+    if len(temps) != n or len(seeds) != n:
+        raise ValueError(
+            f"trials={n} but trial_temperatures has {len(temps)} entries "
+            f"and trial_seeds has {len(seeds)}"
+        )
+    return [{"temperature": float(t), "seed": int(s)} for t, s in zip(temps, seeds)]
+
+
 def run(config_path: str) -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
@@ -77,6 +105,7 @@ def run(config_path: str) -> dict[str, Any]:
         tasks = tasks[: int(task_limit)]
 
     client = create_client(cfg["model"])
+    trials = build_trials(cfg)
 
     drift_enabled = cfg["perturbations"]["schema_drift"].get("enabled", [])
     fault_cfg = cfg["perturbations"]["runtime_faults"]
@@ -103,87 +132,107 @@ def run(config_path: str) -> dict[str, Any]:
             schema = drifted_schema(BASE_SCHEMAS[task.tool], drift)
             strict = strict_baseline and condition == "baseline"
             prompt = build_prompt(task, schema)
-            context = {"task": task, "condition": condition, "drift": drift}
+            base_context = {"task": task, "condition": condition, "drift": drift}
 
-            raw = client.generate(prompt, context)
-            parsed = extract_tool_call(raw)
-            exec_result = _safe_execute(parsed, schema, drift, fault, strict)
+            for trial_index, trial in enumerate(trials):
+                temperature = trial["temperature"]
+                trial_seed = trial["seed"]
+                context = dict(base_context, trial_index=trial_index)
 
-            recovered: bool | None = None
-            retry_prompt = None
-            retry_raw = None
-            if (
-                condition == "runtime_fault"
-                and is_retryable(fault)
-                and not exec_result.get("ok")
-                and retry_once
-            ):
-                feedback = exec_result.get("error", {}).get("message", "tool call failed")
-                retry_prompt = (
-                    prompt
-                    + f"\nYour previous tool call failed: {feedback}\n"
-                    + "Provide a corrected JSON answer:"
+                raw = client.generate(
+                    prompt, context, temperature=temperature, seed=trial_seed
                 )
-                retry_context = dict(context, is_retry=True, feedback=feedback)
-                retry_raw = client.generate(retry_prompt, retry_context)
-                retry_parsed = extract_tool_call(retry_raw)
-                retry_exec = _safe_execute(retry_parsed, schema, drift, None, strict)
-                recovered = bool(retry_exec.get("ok"))
-                exec_result = {
-                    "first_attempt": exec_result,
-                    "retry": retry_exec,
-                    "ok": retry_exec.get("ok", False),
-                }
+                parsed = extract_tool_call(raw)
+                exec_result = _safe_execute(parsed, schema, drift, fault, strict)
 
-            metrics = evaluate(
-                condition,
-                task.expected_call,
-                parsed,
-                exec_result,
-                drift,
-                fault,
-                recovered,
-                schema,
-                strict,
-            )
+                recovered: bool | None = None
+                retry_prompt = None
+                retry_raw = None
+                if (
+                    condition == "runtime_fault"
+                    and is_retryable(fault)
+                    and not exec_result.get("ok")
+                    and retry_once
+                ):
+                    feedback = exec_result.get("error", {}).get("message", "tool call failed")
+                    retry_prompt = (
+                        prompt
+                        + f"\nYour previous tool call failed: {feedback}\n"
+                        + "Provide a corrected JSON answer:"
+                    )
+                    retry_context = dict(context, is_retry=True, feedback=feedback)
+                    retry_raw = client.generate(
+                        retry_prompt,
+                        retry_context,
+                        temperature=temperature,
+                        seed=trial_seed,
+                    )
+                    retry_parsed = extract_tool_call(retry_raw)
+                    retry_exec = _safe_execute(retry_parsed, schema, drift, None, strict)
+                    recovered = bool(retry_exec.get("ok"))
+                    exec_result = {
+                        "first_attempt": exec_result,
+                        "retry": retry_exec,
+                        "ok": retry_exec.get("ok", False),
+                    }
 
-            raw_rows.append(
-                {
-                    "run_id": rid,
-                    "task_id": task.task_id,
-                    "condition": condition,
-                    "prompt_sha256": sha256_text(prompt),
-                    "prompt": prompt,
-                    "raw_output": raw,
-                    "retry_prompt_sha256": sha256_text(retry_prompt) if retry_prompt else None,
-                    "retry_raw_output": retry_raw,
-                }
-            )
-            # No run_id/timestamps here: parsed_results.jsonl must stay
-            # byte-identical across reruns of the same config. Volatile
-            # metadata lives in run_manifest.json instead.
-            parsed_rows.append(
-                {
-                    "task_id": task.task_id,
-                    "condition": condition,
-                    "drift": asdict(drift) if drift else None,
-                    "fault": asdict(fault) if fault else None,
-                    "parsed_call": parsed,
-                    "exec_result": exec_result,
-                    "metrics": metrics,
-                }
-            )
+                metrics = evaluate(
+                    condition,
+                    task.expected_call,
+                    parsed,
+                    exec_result,
+                    drift,
+                    fault,
+                    recovered,
+                    schema,
+                    strict,
+                )
+
+                raw_rows.append(
+                    {
+                        "run_id": rid,
+                        "task_id": task.task_id,
+                        "condition": condition,
+                        "trial_index": trial_index,
+                        "temperature": temperature,
+                        "seed": trial_seed,
+                        "prompt_sha256": sha256_text(prompt),
+                        "prompt": prompt,
+                        "raw_output": raw,
+                        "retry_prompt_sha256": sha256_text(retry_prompt) if retry_prompt else None,
+                        "retry_raw_output": retry_raw,
+                    }
+                )
+                # No run_id/timestamps here: parsed_results.jsonl must stay
+                # byte-identical across reruns of the same config. Volatile
+                # metadata lives in run_manifest.json instead.
+                parsed_rows.append(
+                    {
+                        "task_id": task.task_id,
+                        "condition": condition,
+                        "trial_index": trial_index,
+                        "temperature": temperature,
+                        "seed": trial_seed,
+                        "drift": asdict(drift) if drift else None,
+                        "fault": asdict(fault) if fault else None,
+                        "parsed_call": parsed,
+                        "exec_result": exec_result,
+                        "metrics": metrics,
+                    }
+                )
 
     summary = summarize(parsed_rows)
     summary["run_id"] = rid
     summary["model_provider"] = cfg["model"].get("provider", "mock")
+    summary["num_trials"] = len(trials)
 
-    def record_key(row: dict[str, Any]) -> tuple[str, str, str, str]:
+    def record_key(row: dict[str, Any]) -> tuple[str, str, str, str, int]:
         return (
             row["task_id"],
             row["condition"],
             (row.get("drift") or {}).get("type", ""),
             (row.get("fault") or {}).get("type", ""),
+            int(row.get("trial_index", 0)),
         )
 
     raw_rows.sort(key=record_key)
@@ -203,6 +252,7 @@ def run(config_path: str) -> dict[str, Any]:
             "python": platform.python_version(),
             "platform": platform.platform(),
             "num_tasks": len(tasks),
+            "num_trials": len(trials),
             "num_records": len(parsed_rows),
         },
     )

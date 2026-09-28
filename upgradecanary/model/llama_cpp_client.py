@@ -67,14 +67,23 @@ class LlamaCppClient:
         self._prompt_template = model_cfg.get("prompt_template") or None
         self._stop = model_cfg.get("stop") or None
 
-    def generate(self, prompt: str, context: dict[str, Any] | None = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        *,
+        temperature: float | None = None,
+        seed: int | None = None,
+    ) -> str:
         if self._prompt_template is not None:
             prompt = self._prompt_template.format(prompt=prompt)
+        # Per-call temperature/seed support repeated trials. llama-cpp-python
+        # accepts both per call; seeding is best-effort on GPU (see README).
         kwargs: dict[str, Any] = {
             "prompt": prompt,
-            "temperature": self._temperature,
+            "temperature": self._temperature if temperature is None else float(temperature),
             "max_tokens": self._max_tokens,
-            "seed": self._seed,
+            "seed": self._seed if seed is None else int(seed),
         }
         if self._stop:
             kwargs["stop"] = self._stop

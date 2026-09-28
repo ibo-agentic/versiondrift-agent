@@ -129,6 +129,34 @@ python -m upgradecanary.runner --config configs/pilot.yaml
 # re-run, then compare the two parsed_results.jsonl files; they must be identical
 ```
 
+## Repeated trials
+
+Each task-condition can be repeated across multiple trials to measure
+consistency instead of a single-roll outcome:
+
+```yaml
+trials: 3
+trial_temperatures: [0.0, 0.7, 0.7]
+trial_seeds: [1234, 1235, 1236]
+```
+
+Trial 0 runs greedy (`temperature: 0.0`) as the reproducibility anchor;
+trials 1–2 are sampled at `0.7` with distinct seeds to expose how much the
+outcome depends on decoding luck. Every record carries `trial_index`,
+`temperature`, and `seed`; `summary.json` reports per-condition means across
+trials plus a `by_trial` breakdown. llama-cpp-python accepts per-call
+temperature and seed, so each trial is decoded independently — note that
+llama.cpp seeding is best-effort on GPU, so sampled trials may not be
+perfectly reproducible. The mock provider ignores trial temperature/seed.
+
+Run the repeated-trial real experiments (after installing the backend and
+placing the GGUF files):
+
+```bash
+python -m upgradecanary.runner --config configs/real_trials_v0.2.yaml
+python -m upgradecanary.runner --config configs/real_trials_v0.3.yaml
+```
+
 ## Tests
 
 ```bash
@@ -192,6 +220,8 @@ configs/pilot.yaml          pilot configuration (seed, conditions, perturbations
 configs/real_smoke_v0.2.yaml  real-model smoke config (first 10 tasks, llama_cpp)
 configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, Mistral v0.2)
 configs/real_pilot_v0.3.yaml  real-model pilot config (all 100 tasks, Mistral v0.3)
+configs/real_trials_v0.2.yaml  real-model trials config (100 tasks x 3 trials, Mistral v0.2)
+configs/real_trials_v0.3.yaml  real-model trials config (100 tasks x 3 trials, Mistral v0.3)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 docs/experiment_log.md      dated run notes and harness-fairness decisions
 scripts/generate_tasks.py   deterministic task-file generator
