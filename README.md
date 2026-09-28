@@ -146,12 +146,16 @@ This project never downloads models or installs inference backends for you.
 turn; `n_gpu_layers: -1` offloads all layers and is silently ignored by
 CPU-only builds.
 
-**Prompt format caveat:** the runner sends a plain-text prompt (tool schema +
-JSON-only instruction + question). Instruct models usually expect their chat
-template (`[INST]…[/INST]` for Mistral) — if the smoke run yields prose
-instead of JSON, wrapping the prompt in the model's template is the first
-thing to add. llama.cpp seeding is best-effort on GPU; for byte-identical
-reruns use the mock provider.
+**Prompt template:** Mistral-7B-Instruct is a chat fine-tune — without its
+`[INST]…[/INST]` wrapping it behaves like a base model and tends to answer
+with prose instead of the JSON tool call. The smoke config therefore sets
+`prompt_template: "<s>[INST]\n{prompt}\n[/INST]"`, applied only inside the
+llama_cpp client; the raw prompt (tool schema + JSON-only instruction +
+question) is inserted at `{prompt}`, and `stop: ["</s>"]` cuts generation at
+the turn end. To disable wrapping, remove or comment out `prompt_template`;
+to switch models, adapt the template string and stop sequences (e.g. Llama-3
+chat format). The mock provider never applies templates. llama.cpp seeding is
+best-effort on GPU; for byte-identical reruns use the mock provider.
 
 ## Project layout
 

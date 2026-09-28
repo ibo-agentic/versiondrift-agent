@@ -39,12 +39,22 @@ class LlamaCppClient:
         self._temperature = float(model_cfg.get("temperature", 0.0))
         self._max_tokens = int(model_cfg.get("max_tokens", 512))
         self._seed = int(model_cfg.get("seed", 0))
+        # Optional instruct-style wrapping (e.g. Mistral: "<s>[INST]\n{prompt}\n[/INST]").
+        # Applied only here, so the mock provider and the runner stay
+        # template-agnostic. None = send the raw prompt unchanged.
+        self._prompt_template = model_cfg.get("prompt_template") or None
+        self._stop = model_cfg.get("stop") or None
 
     def generate(self, prompt: str, context: dict[str, Any] | None = None) -> str:
-        output = self._llm.create_completion(
-            prompt=prompt,
-            temperature=self._temperature,
-            max_tokens=self._max_tokens,
-            seed=self._seed,
-        )
+        if self._prompt_template is not None:
+            prompt = self._prompt_template.format(prompt=prompt)
+        kwargs: dict[str, Any] = {
+            "prompt": prompt,
+            "temperature": self._temperature,
+            "max_tokens": self._max_tokens,
+            "seed": self._seed,
+        }
+        if self._stop:
+            kwargs["stop"] = self._stop
+        output = self._llm.create_completion(**kwargs)
         return output["choices"][0]["text"]

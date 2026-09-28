@@ -21,6 +21,10 @@ model:
   temperature: 0.0          # greedy decoding
   max_tokens: 256
   seed: 1234                # llama.cpp seeding is best-effort on GPU (see README)
+  # Mistral-Instruct v0.2 chat template: the raw prompt (tool schema +
+  # JSON-only instruction + question) is inserted at {prompt}.
+  prompt_template: "<s>[INST]\n{prompt}\n[/INST]"
+  stop: ["</s>"]            # safety net; llama.cpp also stops on the model's EOS token
 
 perturbations:
   schema_drift:
