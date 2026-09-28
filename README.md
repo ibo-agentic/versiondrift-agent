@@ -57,12 +57,18 @@ canonical schema first — drift-only fields the original handler does not
 accept are dropped, and drifted string values are coerced to the canonical
 types when unambiguous (`"3"` → `3`) — then run against the mock tool.
 
-The record `score` depends on the condition:
+The record `score` is strict **functional success**, with the same formula
+for every condition:
 
-- `baseline`: parse + tool name + exact args + clean execution
-- `schema_drift`: parse + tool name + intent match + clean execution
-- `runtime_fault`: recovered after a retryable fault; for non-retryable faults
-  (e.g. `stale_result`) a clean execution counts
+> parse + tool name + intent match + validity against the active schema +
+> clean execution
+
+`args_exact` (byte-equality of arguments) and `recovered_after_fault`
+(whether a retry succeeded) are **diagnostic** metrics: they are reported and
+summarized, but they never reduce the score. A call that means the right
+thing, validates against the active schema, and executes cleanly scores 1
+even when its argument strings are not byte-identical (e.g. calculator
+expression whitespace).
 
 ## Requirements
 

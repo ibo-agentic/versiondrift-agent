@@ -134,3 +134,19 @@ def test_unexpected_field_dropped_before_execution():
     assert result["ok"] is True
     canonical = to_canonical_args(call["arguments"], drift, BASE_SCHEMAS["get_weather"])
     assert "include_humidity" not in canonical
+
+
+def test_score_is_functional_not_exact():
+    """args_exact is diagnostic only: byte-mismatched but semantically
+    correct, schema-valid, cleanly executed call scores 1."""
+    expected = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    parsed = {"name": "calculator", "arguments": {"expression": "7*3+11"}}
+    schema = drifted_schema(BASE_SCHEMAS["calculator"], None)
+    metrics = evaluate(
+        "baseline", expected, parsed, {"ok": True}, None, None, None, schema, True
+    )
+    assert metrics["args_exact"] is False
+    assert metrics["args_intent_match"] is True
+    assert metrics["args_valid_under_drift"] is True
+    assert metrics["executor_ok"] is True
+    assert metrics["score"] == 1.0

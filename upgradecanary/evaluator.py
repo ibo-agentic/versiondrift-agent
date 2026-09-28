@@ -1,19 +1,29 @@
 """Deterministic evaluator: pure comparisons, no model in the loop.
 
-Metrics per record are booleans plus a condition-dependent score:
-- baseline:      parse, exact tool name, exact arguments, clean execution
-- schema_drift:  parse, tool name, intended meaning preserved, clean execution
-- runtime_fault: recovery after a retryable fault; for non-retryable faults
-                 (e.g. stale_result) a clean execution counts
+The record ``score`` is strict **functional success**, with the same formula
+for every condition:
+
+    parse_ok AND tool_name_ok AND args_intent_match
+    AND args_valid_under_drift AND executor_ok
+
+Diagnostic metrics (reported and summarized, but never reducing the score):
+
+- ``args_exact``: byte-equality of arguments. A semantically correct,
+  schema-valid, cleanly executed call scores 1 even when argument strings
+  differ (e.g. calculator expression whitespace).
+- ``recovered_after_fault``: whether a retry after a retryable fault
+  succeeded. It does not replace ``executor_ok`` in scoring — the final
+  execution outcome is what counts.
 
 Two argument-level metrics answer different questions:
 - ``args_intent_match``: does the parsed call have the same intended meaning
   as the expected call? Compared in the drifted schema's semantic space, so a
   stale agent's pre-upgrade arguments still count as matching intent.
-- ``args_valid_under_drift``: would the parsed call pass schema validation
-  against the (possibly drifted) schema? A stale-but-well-intentioned call can
-  have intent_match=True and valid_under_drift=False — that gap is the
-  upgrade-drift signal.
+  Calculator expressions count as equal when mathematically equivalent.
+- ``args_valid_under_drift``: would the parsed call pass strict schema
+  validation against the (possibly drifted) schema? A stale-but-well-
+  -intentioned call can have intent_match=True and valid_under_drift=False —
+  that gap is the upgrade-drift signal.
 
 Strict policy: required arguments must be present even if the field spec
 declares a default; defaults are never auto-applied by the executor.
@@ -49,6 +59,8 @@ def evaluate(
     schema: dict[str, Any],
     strict: bool,
 ) -> dict[str, Any]:
+    # condition/fault are accepted for context and record-keeping; the score
+    # itself is condition-independent functional success (see module docstring).
     parse_ok = parsed_call is not None
     tool_name_ok = bool(parse_ok and parsed_call["name"] == expected_call["name"])
     args_exact = bool(parse_ok and parsed_call["arguments"] == expected_call["arguments"])
@@ -69,20 +81,14 @@ def evaluate(
         "args_valid_under_drift": args_valid_under_drift,
         "executor_ok": executor_ok,
         "recovered_after_fault": recovered_after_fault,
+        "score": float(
+            parse_ok
+            and tool_name_ok
+            and args_intent_match
+            and args_valid_under_drift
+            and executor_ok
+        ),
     }
-
-    if condition == "baseline":
-        score = parse_ok and tool_name_ok and args_exact and executor_ok
-    elif condition == "schema_drift":
-        score = parse_ok and tool_name_ok and args_intent_match and executor_ok
-    elif condition == "runtime_fault":
-        if is_retryable(fault):
-            score = bool(recovered_after_fault)
-        else:
-            score = executor_ok
-    else:
-        score = False
-    metrics["score"] = float(score)
     return metrics
 
 

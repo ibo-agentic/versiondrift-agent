@@ -28,3 +28,26 @@ are exploratory until the noted harness fixes land.
   execution; `args_valid_under_drift` stays strict against the drifted schema.
 - Conclusion: the v0.2 vs v0.3 comparison above is exploratory. Both models
   must be rerun after these fixes for a fair comparison.
+
+## 2026-09-28 — Fairness fixes applied; score redefined to functional success
+
+- Fairness fixes applied (semantic expression matching; canonical type
+  coercion and drift-only field dropping before execution) and both models
+  rerun: v0.2 `..._20260928T191059Z`, v0.3 `..._20260928T191615Z`.
+- New issue found: the score formula still gated baseline on `args_exact`, so
+  v0.3 baseline scored 0.88 with every functional metric at 1.0 (calculator
+  whitespace only). Redefined: `score` = `parse_ok ∧ tool_name_ok ∧
+  args_intent_match ∧ args_valid_under_drift ∧ executor_ok`, identical for all
+  conditions. `args_exact` and `recovered_after_fault` are diagnostic only.
+  Parser, drifted-schema validity, and executor validation unchanged.
+- Recomputed offline from the fair-rerun folders (no model reruns).
+  Old formula (stored summary.json): baseline 1.00/0.88, schema_drift
+  0.84/0.82, runtime_fault 0.78/1.00 (v0.2/v0.3).
+  New functional score: baseline 1.00/1.00 (diff 0.00); schema_drift 0.84/0.82
+  (15 neg / 13 pos flips, diff −0.020, 95% CI [−0.120, +0.080] — no
+  significant difference); runtime_fault 0.78/1.00 (diff +0.220, CI
+  [+0.140, +0.300] — significant v0.3 improvement).
+- Interpretation under the repaired harness: v0.3 matches v0.2 on baseline and
+  schema drift (its protocol-validity advantage is real: valid 0.91→1.00,
+  executor_ok 0.91→1.00, but intent is a wash: 0.92 vs 0.82 in opposite
+  directions per task) and is strictly better at fault recovery.
