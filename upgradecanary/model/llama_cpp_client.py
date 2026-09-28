@@ -7,11 +7,33 @@ downloads models — point ``model.path`` at a GGUF file you placed under models
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
+
+# Handles returned by os.add_dll_directory; kept alive for the process
+# lifetime so Windows does not drop the added DLL search paths.
+_dll_dir_handles: list[object] = []
+
+
+def _add_bundled_cuda_dll_dirs() -> None:
+    """Register NVIDIA CUDA runtime DLL folders bundled in the current venv.
+
+    llama-cpp-python's CUDA wheels ship cudart/cublas under
+    site-packages/nvidia/*/bin; adding them here lets llama.dll resolve its
+    CUDA dependencies without CUDA being on PATH.
+    """
+    candidates = [
+        os.path.join(sys.prefix, "Lib", "site-packages", "nvidia", "cuda_runtime", "bin"),
+        os.path.join(sys.prefix, "Lib", "site-packages", "nvidia", "cublas", "bin"),
+    ]
+    for path in candidates:
+        if os.path.isdir(path):
+            _dll_dir_handles.append(os.add_dll_directory(path))
 
 
 class LlamaCppClient:
     def __init__(self, model_cfg: dict[str, Any]) -> None:
+        _add_bundled_cuda_dll_dirs()
         try:
             from llama_cpp import Llama
         except ImportError as exc:

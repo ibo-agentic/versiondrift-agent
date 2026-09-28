@@ -77,6 +77,14 @@ pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-c
 pip install llama-cpp-python
 ```
 
+**CUDA DLL loading (Windows):** the llama_cpp client automatically registers
+the venv's bundled NVIDIA CUDA runtime and cuBLAS folders
+(`<venv>\Lib\site-packages\nvidia\cuda_runtime\bin` and
+`...\nvidia\cublas\bin`) via `os.add_dll_directory` before importing
+`llama_cpp`, so CUDA does not need to be on PATH. Troubleshooting fallback: if
+you still get `Failed to load shared library ... llama.dll`, add your CUDA
+toolkit's `bin` directory to PATH manually.
+
 ## Run the mock pilot (no model needed)
 
 ```bash
@@ -149,19 +157,23 @@ CPU-only builds.
 **Prompt template:** Mistral-7B-Instruct is a chat fine-tune — without its
 `[INST]…[/INST]` wrapping it behaves like a base model and tends to answer
 with prose instead of the JSON tool call. The smoke config therefore sets
-`prompt_template: "<s>[INST]\n{prompt}\n[/INST]"`, applied only inside the
+`prompt_template: "[INST]\n{prompt}\n[/INST]"`, applied only inside the
 llama_cpp client; the raw prompt (tool schema + JSON-only instruction +
 question) is inserted at `{prompt}`, and `stop: ["</s>"]` cuts generation at
-the turn end. To disable wrapping, remove or comment out `prompt_template`;
-to switch models, adapt the template string and stop sequences (e.g. Llama-3
-chat format). The mock provider never applies templates. llama.cpp seeding is
-best-effort on GPU; for byte-identical reruns use the mock provider.
+the turn end. The template intentionally has **no leading `<s>`**:
+llama-cpp-python adds BOS automatically, and a literal `<s>` makes llama.cpp
+warn about a duplicate leading BOS. To disable wrapping, remove or comment out
+`prompt_template`; to switch models, adapt the template string and stop
+sequences (e.g. Llama-3 chat format). The mock provider never applies
+templates. llama.cpp seeding is best-effort on GPU; for byte-identical reruns
+use the mock provider.
 
 ## Project layout
 
 ```
 configs/pilot.yaml          pilot configuration (seed, conditions, perturbations)
 configs/real_smoke_v0.2.yaml  real-model smoke config (first 10 tasks, llama_cpp)
+configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, llama_cpp)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 scripts/generate_tasks.py   deterministic task-file generator
 tests/                      pytest suite (python -m pytest -q)

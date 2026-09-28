@@ -1,15 +1,16 @@
-# Real-model smoke test config (v0.2).
+# Real-model pilot config (v0.2) — full 100-task run.
+# Same model settings as real_smoke_v0.2.yaml, without task_limit.
 # Prerequisites (manual — this project never downloads or installs for you):
 #   1. pip install llama-cpp-python   (see README; CUDA wheel for the RTX 4060)
 #   2. Place the GGUF file at: models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
 # Do NOT run this config until both steps are done.
 
-experiment: upgradecanary-real-smoke-v0.2
+experiment: upgradecanary-real-pilot-v0.2
 seed: 1234
 
 data: data/base_tasks.jsonl
 output_dir: results
-task_limit: 10              # smoke scope: first 10 tasks only
+# no task_limit: all 100 tasks
 
 conditions: [baseline, schema_drift, runtime_fault]
 
