@@ -121,7 +121,7 @@ def execute(
     problems = validate_call(name, arguments, schema, strict)
     if problems:
         return {"ok": False, "error": {"type": "validation", "problems": problems}}
-    canonical = to_canonical_args(arguments, drift)
+    canonical = to_canonical_args(arguments, drift, BASE_SCHEMAS.get(name))
     result = HANDLERS[name](**canonical)
     return apply_fault(name, result, fault)
 

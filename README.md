@@ -46,6 +46,17 @@ rejected by the upgraded schema.
 declares a `default`** — the executor never auto-applies defaults. Missing
 required fields always fail validation.
 
+**Four comparison levels.** The metrics compare a parsed call against the
+expectation at increasing strictness: `args_exact` is byte equality.
+`args_intent_match` is semantic equality — drift-space normalization plus
+mathematical equivalence for calculator expressions (`"7*3+11"` equals
+`"7 * 3 + 11"`; AST-based, never `eval()`). `args_valid_under_drift` is strict
+validation against the drifted schema the upgraded tool advertises.
+`executor_ok` is canonical execution: the call is mapped back to the
+canonical schema first — drift-only fields the original handler does not
+accept are dropped, and drifted string values are coerced to the canonical
+types when unambiguous (`"3"` → `3`) — then run against the mock tool.
+
 The record `score` depends on the condition:
 
 - `baseline`: parse + tool name + exact args + clean execution
@@ -176,6 +187,7 @@ configs/real_smoke_v0.2.yaml  real-model smoke config (first 10 tasks, llama_cpp
 configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, Mistral v0.2)
 configs/real_pilot_v0.3.yaml  real-model pilot config (all 100 tasks, Mistral v0.3)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
+docs/experiment_log.md      dated run notes and harness-fairness decisions
 scripts/generate_tasks.py   deterministic task-file generator
 tests/                      pytest suite (python -m pytest -q)
 upgradecanary/

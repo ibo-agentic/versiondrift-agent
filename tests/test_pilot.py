@@ -7,8 +7,13 @@ from collections import Counter
 from pathlib import Path
 
 from upgradecanary.evaluator import evaluate
-from upgradecanary.perturbations.schema_drift import apply, drifted_schema
-from upgradecanary.tools import BASE_SCHEMAS, validate_call
+from upgradecanary.perturbations.schema_drift import (
+    apply,
+    drifted_schema,
+    expressions_equivalent,
+    to_canonical_args,
+)
+from upgradecanary.tools import BASE_SCHEMAS, execute, validate_call
 from upgradecanary.utils import rng_for
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -83,3 +88,49 @@ def test_task_coverage_counts():
         assert drifts.get(drift_type, 0) >= 10, (
             f"drift type {drift_type} underrepresented: {drifts.get(drift_type, 0)}"
         )
+
+
+def test_expression_intent_semantics():
+    """args_intent_match accepts mathematically equivalent expressions;
+    args_exact stays byte-strict."""
+    expected = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    parsed = {"name": "calculator", "arguments": {"expression": "7*3+11"}}
+    schema = drifted_schema(BASE_SCHEMAS["calculator"], None)
+    metrics = evaluate("baseline", expected, parsed, {"ok": True}, None, None, None, schema, True)
+    assert metrics["args_exact"] is False
+    assert metrics["args_intent_match"] is True
+    assert expressions_equivalent("7*3+11", "7 * 3 + 11") is True
+    assert expressions_equivalent("1+2", "4") is False
+    assert expressions_equivalent("two plus two", "4") is None
+
+
+def test_type_mutation_canonicalized_before_execution():
+    """A correctly string-typed value under the drifted schema passes strict
+    drifted validation and executes after safe coercion to the canonical type."""
+    drift = apply("search_docs", ["type_mutation"], rng_for(1, "t", "c"), "type_mutation")
+    schema = drifted_schema(BASE_SCHEMAS["search_docs"], drift)
+    call = {"name": "search_docs", "arguments": {"query": "write amplification", "top_k": "3"}}
+    assert validate_call(call["name"], call["arguments"], schema, strict=False) == []
+    result = execute(call, schema, drift, None, strict=False)
+    assert result["ok"] is True
+    canonical = to_canonical_args(call["arguments"], drift, BASE_SCHEMAS["search_docs"])
+    assert canonical["top_k"] == 3
+    assert isinstance(canonical["top_k"], int)
+
+
+def test_unexpected_field_dropped_before_execution():
+    """A correctly included drift-only field passes strict drifted validation
+    and is dropped before the canonical mock handler runs."""
+    drift = apply(
+        "get_weather", ["unexpected_field"], rng_for(1, "t", "c"), "unexpected_field"
+    )
+    schema = drifted_schema(BASE_SCHEMAS["get_weather"], drift)
+    call = {
+        "name": "get_weather",
+        "arguments": {"city": "Berlin", "unit": "celsius", "include_humidity": True},
+    }
+    assert validate_call(call["name"], call["arguments"], schema, strict=False) == []
+    result = execute(call, schema, drift, None, strict=False)
+    assert result["ok"] is True
+    canonical = to_canonical_args(call["arguments"], drift, BASE_SCHEMAS["get_weather"])
+    assert "include_humidity" not in canonical
