@@ -86,3 +86,36 @@ are exploratory until the noted harness fixes land.
   trials configs otherwise. This enables clean across-version comparisons:
   v0.1→v0.2 (tool/function-calling training introduced) and v0.2→v0.3
   (tokenizer v3 + training refresh).
+
+## 2026-09-29 — Matched itlwas three-version results (analysis: scripts/analyze_version_trials.py)
+
+- Runs: `..._v0.1_...T120210Z`, `..._v0.2_...T121701Z`, `..._v0.3_...T132749Z`;
+  900/900 records matched across all three (task, condition, drift, fault,
+  trial).
+- Context caveat: v0.3 ran with n_ctx=1024 (v0.1/v0.2: 2048). Assessment: the
+  125 unique prompts are byte-identical across versions, 510–857 chars
+  (~150–250 tokens at conservative estimates) against a 768-token prompt
+  budget; v0.3 shows zero truncation signals (0 unclosed outputs, 0 parse
+  failures, max output 105 chars); its 9 baseline failures are deterministic
+  query-paraphrase behavior on tasks 023/029/035, identical across all
+  trials. Comparison valid; a 2048 rerun of v0.3 is still desirable for
+  exactness.
+- Pooled functional scores (v0.1 / v0.2 / v0.3): baseline 1.00 / 1.00 / 0.97;
+  schema_drift 0.99 / 0.90 / 0.93; runtime_fault 1.00 / 0.76 / 0.97.
+- Pairwise (task-level cluster bootstrap 95% CI): v0.1→v0.2: drift −0.093
+  [−0.143, −0.047], fault −0.243 [−0.323, −0.167] — significant regressions
+  (field_drop 0.93→0.43, unexpected_field 0.97→0.60, fault recovery collapse
+  on tool_exception 1.00→0.49). v0.2→v0.3: fault +0.213 [+0.123, +0.307]
+  significant (recovery back to ~1.00); drift +0.033 [−0.023, +0.090] not
+  significant. v0.1→v0.3: drift −0.060 [−0.107, −0.020] significant; fault
+  −0.030 [−0.070, 0.000] marginal.
+- Consistency (mean per task×condition score range over trials): v0.3 0.007 <
+  v0.1 0.010 << v0.2 0.060. All-trials-succeed: 297/300 (v0.1), 257/300
+  (v0.2), 286/300 (v0.3).
+- Main findings: (1) v0.1 is the strongest on this harness — the v0.2
+  function-calling training coincided with a large robustness regression,
+  especially retry-after-fault behavior; (2) v0.3 recovers most of it and is
+  the most consistent of the three, but does not fully reach v0.1 on fault
+  recovery or baseline query fidelity; (3) the earlier mixed-quantizer
+  v0.2→v0.3 direction (large fault-recovery gain) replicates under matched
+  quantizers (+0.21), so that preliminary conclusion stands.
