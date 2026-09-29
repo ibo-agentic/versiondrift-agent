@@ -50,7 +50,9 @@ required fields always fail validation.
 expectation at increasing strictness: `args_exact` is byte equality.
 `args_intent_match` is semantic equality — drift-space normalization plus
 mathematical equivalence for calculator expressions (`"7*3+11"` equals
-`"7 * 3 + 11"`; AST-based, never `eval()`). `args_valid_under_drift` is strict
+`"7 * 3 + 11"`; AST-based, never `eval()`), canonical-key aware so the
+equivalence applies even when a drift renamed the argument
+(`expression` → `expr`). `args_valid_under_drift` is strict
 validation against the drifted schema the upgraded tool advertises.
 `executor_ok` is canonical execution: the call is mapped back to the
 canonical schema first — drift-only fields the original handler does not

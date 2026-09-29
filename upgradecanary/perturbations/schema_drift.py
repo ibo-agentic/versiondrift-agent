@@ -255,15 +255,31 @@ def to_new_space(arguments: dict[str, Any], drift: Drift | None) -> dict[str, An
     return args
 
 
+def _canonical_key(key: str, drift: Drift | None) -> str:
+    """Map a drifted-space key back to its canonical argument name."""
+    if drift is not None and drift.type == "field_rename":
+        if key == drift.params["new_name"]:
+            return drift.field
+    return key
+
+
 def compatible(parsed: dict[str, Any], expected: dict[str, Any], drift: Drift | None) -> bool:
     """True if parsed arguments are semantically correct in the drifted
-    schema's space (see _value_matches for per-argument semantics)."""
+    schema's space (see _value_matches for per-argument semantics).
+
+    Keys are mapped back to canonical names before per-argument comparison, so
+    semantic rules keyed on the canonical argument (arithmetic equivalence for
+    calculator expressions) apply even when a drift renamed the argument
+    (``expression`` -> ``expr``)."""
     parsed_new = to_new_space(parsed, drift)
     expected_new = to_new_space(expected, drift)
     if drift is not None and drift.type == "unexpected_field":
         # The new required field may be absent in a pre-upgrade call; judge only
         # the arguments that exist in the canonical expectation.
         return all(
-            _value_matches(k, parsed_new.get(k), v) for k, v in expected_new.items()
+            _value_matches(_canonical_key(k, drift), parsed_new.get(k), v)
+            for k, v in expected_new.items()
         )
-    return _args_match(parsed_new, expected_new)
+    parsed_canon = {_canonical_key(k, drift): v for k, v in parsed_new.items()}
+    expected_canon = {_canonical_key(k, drift): v for k, v in expected_new.items()}
+    return _args_match(parsed_canon, expected_canon)

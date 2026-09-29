@@ -226,3 +226,56 @@ def test_trial_config_validation():
         runner.build_trials(base)
     ok = runner.build_trials({"trials": 2, "model": {"temperature": 0.0, "seed": 9}})
     assert ok == [{"temperature": 0.0, "seed": 9}] * 2
+
+
+def _expr_rename_drift():
+    drift = apply(
+        "calculator", ["field_rename"], rng_for(7, "t", "schema_drift"), "field_rename"
+    )
+    assert drift.field == "expression" and drift.params["new_name"] == "expr"
+    return drift
+
+
+def test_renamed_expression_equivalence():
+    """expression->expr rename with different spacing: intent matches on
+    canonical argument semantics, not the literal drifted key name."""
+    drift = _expr_rename_drift()
+    schema = drifted_schema(BASE_SCHEMAS["calculator"], drift)
+    expected = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    adapted = {"name": "calculator", "arguments": {"expr": "7*3+11"}}
+    metrics = evaluate(
+        "schema_drift", expected, adapted, {"ok": True}, drift, None, None, schema, False
+    )
+    assert metrics["args_intent_match"] is True
+    assert metrics["args_valid_under_drift"] is True
+
+
+def test_renamed_expression_not_equivalent():
+    """Same rename, but the expression evaluates differently: no match."""
+    drift = _expr_rename_drift()
+    schema = drifted_schema(BASE_SCHEMAS["calculator"], drift)
+    expected = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    wrong = {"name": "calculator", "arguments": {"expr": "7*3+12"}}
+    metrics = evaluate(
+        "schema_drift", expected, wrong, {"ok": True}, drift, None, None, schema, False
+    )
+    assert metrics["args_intent_match"] is False
+
+
+def test_renamed_expression_requires_matching_key():
+    """A call under the rename must still carry the right argument; a wrong
+    key fails even if its value is an equivalent expression."""
+    drift = _expr_rename_drift()
+    schema = drifted_schema(BASE_SCHEMAS["calculator"], drift)
+    expected = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    bad_key = {"name": "calculator", "arguments": {"result": "7*3+11"}}
+    metrics = evaluate(
+        "schema_drift", expected, bad_key, {"ok": True}, drift, None, None, schema, False
+    )
+    assert metrics["args_intent_match"] is False
+    # A stale call using the pre-upgrade name still matches intent.
+    stale = {"name": "calculator", "arguments": {"expression": "7 * 3 + 11"}}
+    stale_metrics = evaluate(
+        "schema_drift", expected, stale, {"ok": True}, drift, None, None, schema, False
+    )
+    assert stale_metrics["args_intent_match"] is True

@@ -51,3 +51,26 @@ are exploratory until the noted harness fixes land.
   schema drift (its protocol-validity advantage is real: valid 0.91→1.00,
   executor_ok 0.91→1.00, but intent is a wash: 0.92 vs 0.82 in opposite
   directions per task) and is strictly better at fault recovery.
+
+## 2026-09-28 — Fix: renamed-expression intent artifact (prior schema_drift conclusions invalid)
+
+- Artifact: the arithmetic-equivalence check in intent matching keyed on the
+  literal argument name "expression". Under the `expression`→`expr` rename,
+  the comparison saw key "expr", missed the special case, and fell back to
+  string equality — marking v0.3's correctly adapted `{"expr": "7*3+11"}`
+  calls as intent failures (44/45 calculator rename records in the
+  repeated-trial runs; concentrated in tasks 056–070).
+- Why it skewed v0.3: v0.3 both adapts the rename and strips whitespace, and
+  only that combination hit the missed key; v0.2 kept original spacing and
+  never triggered it. The repeated-trial schema_drift result (pooled
+  0.86/0.82, diff −0.047, CI [−0.137, +0.043]) was artifact-inflated against
+  v0.3, and every earlier schema_drift conclusion involving calculator
+  field_rename is invalid.
+- Fix: `compatible()` now maps drifted keys back to canonical names
+  (`_canonical_key`) before per-argument semantic comparison.
+  `args_exact`, `args_valid_under_drift`, executor validation, and the
+  functional score formula are unchanged.
+- Corrected metrics were recomputed offline from the saved parsed_results of
+  the repeated-trial runs (no model reruns) and written beside the originals
+  as `parsed_results_corrected.jsonl` / `summary_corrected.json`. The
+  corrected paired analysis is the authoritative schema_drift comparison.
