@@ -227,6 +227,10 @@ configs/real_trials_v0.3.yaml  real-model trials config (100 tasks x 3 trials, M
 configs/real_trials_itlwas_v0.1.yaml  matched-quantizer trials config (itlwas v0.1)
 configs/real_trials_itlwas_v0.2.yaml  matched-quantizer trials config (itlwas v0.2)
 configs/real_trials_itlwas_v0.3.yaml  matched-quantizer trials config (itlwas v0.3)
+configs/real_smoke_qwen25.yaml    Qwen2.5-7B smoke config (10 tasks, ChatML, split GGUF part 1)
+configs/real_smoke_qwen3.yaml     Qwen3-8B smoke config (10 tasks, ChatML)
+configs/real_trials_qwen25.yaml   Qwen2.5-7B trials config (100 tasks x 3 trials, ChatML)
+configs/real_trials_qwen3.yaml    Qwen3-8B trials config (100 tasks x 3 trials, ChatML)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 docs/experiment_log.md      dated run notes and harness-fairness decisions
 scripts/generate_tasks.py   deterministic task-file generator

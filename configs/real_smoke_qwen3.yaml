@@ -1,0 +1,36 @@
+# Real-model smoke config (Qwen3-8B) — first 10 tasks, 1 trial.
+# ChatML template (Qwen native).
+# Prerequisites: llama-cpp-python installed; GGUF under models/qwen/ (manual).
+
+experiment: upgradecanary-real-smoke-qwen3
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+task_limit: 10
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 1
+
+model:
+  provider: llama_cpp
+  path: models/qwen/Qwen3-8B-Q4_K_M.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0
+  max_tokens: 256
+  seed: 1234
+  # ChatML template (Qwen native); llama-cpp-python adds BOS automatically.
+  prompt_template: "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant"
+  stop: ["<|im_end|>"]
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true
