@@ -1,0 +1,39 @@
+# Real-model repeated-trials config (itlwas v0.3) — 100 tasks x 3 trials.
+# Mat-quantizer matched set: same Q4_K_M quantizer across v0.1/v0.2/v0.3.
+# Same settings as real_trials_v0.2.yaml; only model.path and run name differ.
+# Prerequisites: llama-cpp-python installed; GGUF at model.path (manual).
+
+experiment: upgradecanary-real-trials-itlwas-v0.3
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+# no task_limit: all 100 tasks
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 3
+trial_temperatures: [0.0, 0.7, 0.7]
+trial_seeds: [1234, 1235, 1236]
+
+model:
+  provider: llama_cpp
+  path: models/itlwas/mistral-7b-instruct-v0.3-q4_k_m.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0          # fallback for trials without explicit temperatures
+  max_tokens: 256
+  seed: 1234
+  # No leading "<s>" — llama-cpp-python adds BOS automatically.
+  prompt_template: "[INST]\n{prompt}\n[/INST]"
+  stop: ["</s>"]
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true

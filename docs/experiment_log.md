@@ -74,3 +74,15 @@ are exploratory until the noted harness fixes land.
   the repeated-trial runs (no model reruns) and written beside the originals
   as `parsed_results_corrected.jsonl` / `summary_corrected.json`. The
   corrected paired analysis is the authoritative schema_drift comparison.
+
+## 2026-09-29 — Matched itlwas three-version phase begins
+
+- The earlier v0.2 vs v0.3 comparison used whatever quantizer each release
+  shipped with (mixed quantizers), so it is preliminary: part of any
+  difference could be quantization, not the model generation.
+- The matched phase uses the itlwas Q4_K_M set (v0.1/v0.2/v0.3, same
+  quantizer, ~4.07 GiB each under `models/itlwas/`) with configs
+  `configs/real_trials_itlwas_v0.{1,2,3}.yaml` — identical settings to the
+  trials configs otherwise. This enables clean across-version comparisons:
+  v0.1→v0.2 (tool/function-calling training introduced) and v0.2→v0.3
+  (tokenizer v3 + training refresh).

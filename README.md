@@ -224,6 +224,9 @@ configs/real_pilot_v0.2.yaml  real-model pilot config (all 100 tasks, Mistral v0
 configs/real_pilot_v0.3.yaml  real-model pilot config (all 100 tasks, Mistral v0.3)
 configs/real_trials_v0.2.yaml  real-model trials config (100 tasks x 3 trials, Mistral v0.2)
 configs/real_trials_v0.3.yaml  real-model trials config (100 tasks x 3 trials, Mistral v0.3)
+configs/real_trials_itlwas_v0.1.yaml  matched-quantizer trials config (itlwas v0.1)
+configs/real_trials_itlwas_v0.2.yaml  matched-quantizer trials config (itlwas v0.2)
+configs/real_trials_itlwas_v0.3.yaml  matched-quantizer trials config (itlwas v0.3)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 docs/experiment_log.md      dated run notes and harness-fairness decisions
 scripts/generate_tasks.py   deterministic task-file generator
