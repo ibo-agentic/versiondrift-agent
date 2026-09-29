@@ -145,3 +145,23 @@ are exploratory until the noted harness fixes land.
   single model family; thresholds (±0.05, 0.95 accuracy) chosen post hoc;
   subsets sampled from the same 100 tasks that define the ground truth
   (in-distribution); AUROC undefined with two pairs. See docs/paper_story.md.
+
+## 2026-09-29 — v0.3 matched-context rerun: caveat closed, Mistral phase complete
+
+- Rerun: `upgradecanary-real-trials-itlwas-v0.3_seed1234_20260929T192811Z`
+  with n_ctx=2048 (matching v0.1/v0.2). Verified: its summary is identical
+  to the earlier n_ctx=1024 run (`..._20260929T132749Z`) apart from run_id —
+  baseline 0.97, schema_drift 0.93, runtime_fault 0.97, n=300 per condition.
+  The low-context assessment is confirmed; no truncation or prompt-fit
+  effects existed at 1024 either.
+- The v0.3 context caveat is now closed. No open methodological caveats
+  remain for the matched Mistral phase: same Q4_K_M quantizer (itlwas set),
+  same context length, same seeds/trials across v0.1/v0.2/v0.3.
+- Matched Mistral phase status: methodologically complete. Reference
+  findings (see entries above): v0.1 strongest overall (fault recovery
+  1.00, drift 0.99); v0.2 significantly regressed (fault −0.243, drift
+  −0.093 vs v0.1); v0.3 recovered most of it (fault 0.97, drift 0.93) and is
+  the most consistent (mean per-task range 0.007). Release-gate reference
+  numbers: 40-task in-distribution canary at >= 0.95 accuracy; 10–20 task
+  canaries selected on one upgrade pair classify the held-out pair with zero
+  errors (leave-one-upgrade-out validation).
