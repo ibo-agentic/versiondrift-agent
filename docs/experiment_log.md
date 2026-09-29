@@ -119,3 +119,29 @@ are exploratory until the noted harness fixes land.
   recovery or baseline query fidelity; (3) the earlier mixed-quantizer
   v0.2→v0.3 direction (large fault-recovery gain) replicates under matched
   quantizers (+0.21), so that preliminary conclusion stands.
+
+## 2026-09-29 — Release-gate simulation: canary subsets predict upgrade outcomes
+
+- Design: paired matching as before (task, condition, drift, fault, trial);
+  ground truth = full-suite stress difference (schema_drift + runtime_fault
+  pooled, 600 records); harmful < −0.05, beneficial > +0.05, else neutral.
+  200 deterministic subsets per size (10/20/30/40/50 tasks; sampling seed
+  20240929). Script: `scripts/analyze_release_gate.py`.
+- Full-suite truth: v0.1→v0.2 = −0.168 (harmful); v0.2→v0.3 = +0.123
+  (beneficial).
+- Results: v0.1→v0.2 is easy to flag — 93.5% accuracy at 10 tasks, 100% from
+  30; false-accept 6.5% at size 10, 0% from 30. v0.2→v0.3 is harder
+  (beneficial signal driven by fault recovery; drift alone is neutral):
+  false-reject 24% at 10 tasks, 9% at 30, 4% at 40, 1% at 50.
+- Best tradeoff: 40 tasks — minimum size reaching ≥0.95 accuracy on every
+  pair (0.96 / 1.00). At 40 tasks the canary runs ~3x fewer records than the
+  full suite with near-certain gating.
+- Informativeness: runtime_fault categories dominate both upgrades
+  (tool_exception ±0.51, partial_result ±0.30; a fault-only canary gates both
+  pairs correctly); schema_drift field_drop (−0.50) and unexpected_field
+  (−0.37/+0.33) carry the v0.1→v0.2 harm and part of the v0.2→v0.3 recovery.
+  Top single tasks: 015/017 (±0.83), 011/019/020 (±0.67).
+- Limitations: only two upgrade pairs (one harmful, one beneficial) from a
+  single model family; thresholds (±0.05, 0.95 accuracy) chosen post hoc;
+  subsets sampled from the same 100 tasks that define the ground truth
+  (in-distribution); AUROC undefined with two pairs. See docs/paper_story.md.
