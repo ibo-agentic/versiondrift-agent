@@ -300,16 +300,68 @@ def _canonical_key(key: str, drift: Drift | None) -> str:
     return key
 
 
-def compatible(parsed: dict[str, Any], expected: dict[str, Any], drift: Drift | None) -> bool:
+def _value_acceptable(parsed_val: Any, acceptable_vals: list[Any]) -> bool:
+    """Membership in the acceptable set, tolerant to drift-space type coercion
+    (e.g. type_mutation comparing "5" against [5])."""
+    if parsed_val in acceptable_vals:
+        return True
+    as_str = str(parsed_val)
+    return any(as_str == str(v) for v in acceptable_vals)
+
+
+def _acceptable_intent(
+    parsed_new: dict[str, Any],
+    expected_new: dict[str, Any],
+    drift: Drift | None,
+    acceptable: dict[str, list[Any]],
+    active_schema: dict[str, Any] | None,
+) -> bool:
+    """BFCL-aware intent: canonical-name comparison with omission tolerance.
+
+    - every expected parameter must be present with an acceptable value, or
+      omitted when its acceptable set contains "" (BFCL omission semantics);
+    - extra arguments are tolerated only when schema-declared or part of the
+      task's acceptable map (a known ground-truth parameter, e.g. one dropped
+      by a field_drop drift) — undeclared hallucinated arguments fail intent.
+    """
+    parsed_c = {_canonical_key(k, drift): v for k, v in parsed_new.items()}
+    expected_c = {_canonical_key(k, drift): v for k, v in expected_new.items()}
+    declared = (active_schema or {}).get("args", {})
+    for key in parsed_c:
+        if key not in expected_c and key not in declared and key not in acceptable:
+            return False
+    for pname, vals in acceptable.items():
+        if pname not in expected_c:
+            continue  # canonically absent (e.g. dropped by field_drop drift)
+        if pname in parsed_c:
+            if not _value_acceptable(parsed_c[pname], vals):
+                return False
+        elif "" not in vals:
+            return False  # omission not permitted by BFCL semantics
+    return True
+
+
+def compatible(
+    parsed: dict[str, Any],
+    expected: dict[str, Any],
+    drift: Drift | None,
+    acceptable: dict[str, list[Any]] | None = None,
+    active_schema: dict[str, Any] | None = None,
+) -> bool:
     """True if parsed arguments are semantically correct in the drifted
     schema's space (see _value_matches for per-argument semantics).
 
     Keys are mapped back to canonical names before per-argument comparison, so
     semantic rules keyed on the canonical argument (arithmetic equivalence for
     calculator expressions) apply even when a drift renamed the argument
-    (``expression`` -> ``expr``)."""
+    (``expression`` -> ``expr``). When ``acceptable`` is provided (BFCL-derived
+    tasks), BFCL acceptable-values semantics apply instead of exact matching;
+    when it is None (synthetic suite), behavior is exactly as before.
+    """
     parsed_new = to_new_space(parsed, drift)
     expected_new = to_new_space(expected, drift)
+    if acceptable is not None:
+        return _acceptable_intent(parsed_new, expected_new, drift, acceptable, active_schema)
     if drift is not None and drift.type == "unexpected_field":
         # The new required field may be absent in a pre-upgrade call; judge only
         # the arguments that exist in the canonical expectation.

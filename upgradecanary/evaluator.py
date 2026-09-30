@@ -20,6 +20,9 @@ Two argument-level metrics answer different questions:
   as the expected call? Compared in the drifted schema's semantic space, so a
   stale agent's pre-upgrade arguments still count as matching intent.
   Calculator expressions count as equal when mathematically equivalent.
+  BFCL-derived tasks (``acceptable`` map provided) use BFCL acceptable-values
+  semantics: any listed acceptable value satisfies intent, and a parameter
+  whose acceptable set contains "" may be omitted.
 - ``args_valid_under_drift``: would the parsed call pass strict schema
   validation against the (possibly drifted) schema? A stale-but-well-
   -intentioned call can have intent_match=True and valid_under_drift=False —
@@ -58,6 +61,7 @@ def evaluate(
     recovered_after_fault: bool | None,
     schema: dict[str, Any],
     strict: bool,
+    acceptable: dict[str, list[Any]] | None = None,
 ) -> dict[str, Any]:
     # condition/fault are accepted for context and record-keeping; the score
     # itself is condition-independent functional success (see module docstring).
@@ -65,7 +69,14 @@ def evaluate(
     tool_name_ok = bool(parse_ok and parsed_call["name"] == expected_call["name"])
     args_exact = bool(parse_ok and parsed_call["arguments"] == expected_call["arguments"])
     args_intent_match = bool(
-        parse_ok and compatible(parsed_call["arguments"], expected_call["arguments"], drift)
+        parse_ok
+        and compatible(
+            parsed_call["arguments"],
+            expected_call["arguments"],
+            drift,
+            acceptable=acceptable,
+            active_schema=schema,
+        )
     )
     args_valid_under_drift = bool(
         parse_ok

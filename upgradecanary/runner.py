@@ -212,6 +212,7 @@ def run(config_path: str) -> dict[str, Any]:
                     recovered,
                     schema,
                     strict,
+                    acceptable=task.acceptable,
                 )
 
                 raw_rows.append(

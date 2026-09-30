@@ -231,3 +231,31 @@ are exploratory until the noted harness fixes land.
 - Limitations: only four decisions (two borderline-neutral); alpha estimated
   from the same suite it is applied to; thresholds still post hoc (though
   now sensitivity-bounded); calibration transfer demonstrated one-way.
+
+## 2026-09-30 — BFCL smoke findings and acceptable-values intent amendment
+
+- BFCL smoke (itlwas Mistral v0.2, 10 tasks, run
+  `upgradecanary-bfcl-smoke-itlwas-v0.2_seed1234_20260930T183543Z`): baseline
+  6/10 — two failures are a BFCL-style `{"properties": {...}}` argument
+  wrapper (true model error; BFCL's own checker would also reject), two are
+  omitted arguments whose acceptable sets contain only a single required
+  value (true model errors, fairly scored). schema_drift 1/10: all failures
+  are stale-agent non-adaptation (old names/types after rename/mutation,
+  missing new required field), scored fairly. v0.2 adapted to renames on the
+  synthetic suite but 0/3 on BFCL-native rendering — a real model/format
+  interaction, flagged as a finding.
+- Unfairness found: `args_intent_match` ignored BFCL acceptable-values
+  semantics — multi-value sets required the first canonical value exactly,
+  and omission-tolerant parameters (acceptable set contains "") were scored
+  as mandatory. Across the 100-task suite: **42 tasks** have at least one
+  omission-tolerant parameter; **41 tasks** have at least one multi-value
+  acceptable parameter (post-regeneration counts).
+- Amendment (docs/protocol.md): intent for BFCL tasks now passes on any
+  acceptable value or permitted omission; extras tolerated only when
+  schema-declared or in the acceptable map. Synthetic behavior unchanged
+  (acceptable=None path); validity/execution strictness and the functional
+  score formula unchanged. Conversion updated so "" markers are preserved in
+  the stored acceptable map; suite regenerated (selection unchanged).
+- Zero smoke-run scores would change under the amendment (all observed
+  omissions were genuinely required); the fix matters for the 22+15 affected
+  tasks in full-suite runs.

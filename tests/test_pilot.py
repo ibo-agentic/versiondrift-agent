@@ -334,6 +334,80 @@ def test_synthetic_loader_unchanged():
     assert all(t.internal_schema is None for t in tasks)
 
 
+def _bfcl_style_task():
+    schema = {
+        "name": "demo_tool",
+        "description": "demo",
+        "args": {
+            "city": {"type": "string", "required": True},
+            "days": {"type": "integer", "required": False},
+        },
+    }
+    expected = {"name": "demo_tool", "arguments": {"city": "Berlin", "days": 3}}
+    acceptable = {"city": ["Berlin", "Munich"], "days": [3, ""]}
+    return schema, expected, acceptable
+
+
+def test_bfcl_acceptable_intent_semantics():
+    schema, expected, acceptable = _bfcl_style_task()
+
+    def metrics_for(parsed_args):
+        parsed = {"name": "demo_tool", "arguments": parsed_args}
+        return evaluate(
+            "baseline", expected, parsed, {"ok": True}, None, None, None,
+            schema, True, acceptable=acceptable,
+        )
+
+    # omission-tolerant parameter omitted -> intent passes (BFCL "" semantics)
+    m = metrics_for({"city": "Berlin"})
+    assert m["args_intent_match"] is True
+    # multi-value acceptable set: any listed value satisfies intent
+    assert metrics_for({"city": "Munich", "days": 3})["args_intent_match"] is True
+    # required argument missing (no "" in its set) -> intent fails
+    assert metrics_for({"days": 3})["args_intent_match"] is False
+    # value outside the acceptable set -> intent fails
+    assert metrics_for({"city": "Paris", "days": 3})["args_intent_match"] is False
+    # undeclared extra argument -> intent fails; declared optional extra -> passes
+    assert metrics_for({"city": "Berlin", "days": 3, "bogus": 1})["args_intent_match"] is False
+
+
+def test_bfcl_intent_drift_validity_still_strict():
+    """Intent may be tolerant under acceptable semantics, but drift-schema
+    validity stays strict: an int-typed value under a string-mutated schema
+    still fails args_valid_under_drift."""
+    schema, expected, acceptable = _bfcl_style_task()
+    drift = apply("demo_tool", ["type_mutation"], rng_for(3, "t", "schema_drift"),
+                  "type_mutation", schema=schema)
+    drifted = drifted_schema(schema, drift)
+    parsed = {"name": "demo_tool", "arguments": {"city": "Berlin", "days": 3}}
+    m = evaluate("schema_drift", expected, parsed, {"ok": False}, drift, None, None,
+                 drifted, False, acceptable=acceptable)
+    assert m["args_intent_match"] is True   # 3 is in the acceptable set
+    assert m["args_valid_under_drift"] is False  # schema now demands a string
+
+
+def test_bfcl_acceptable_score_and_synthetic_unchanged():
+    schema, expected, acceptable = _bfcl_style_task()
+    parsed = {"name": "demo_tool", "arguments": {"city": "Munich"}}  # acceptable, omission-tolerant
+    m = evaluate("baseline", expected, parsed, {"ok": True}, None, None, None,
+                 schema, True, acceptable=acceptable)
+    assert m["score"] == 1.0  # functional formula unchanged
+    # synthetic path (acceptable=None) is byte-for-byte the old behavior:
+    ms = evaluate("baseline", expected, parsed, {"ok": True}, None, None, None,
+                  schema, True)
+    assert ms["args_intent_match"] is False  # exact key-set matching, as before
+
+
+def test_bfcl_conversion_preserves_omission_markers(tmp_path):
+    bfcl_mod.generate(tmp_path)
+    tasks = load_tasks(tmp_path / "bfcl_tasks.jsonl")
+    for task in tasks:
+        for key, value in task.expected_call["arguments"].items():
+            assert value != "" and value in task.acceptable[key]
+    n_omit = sum(1 for t in tasks if any("" in v for v in t.acceptable.values()))
+    print(f"omission-tolerant tasks: {n_omit}")  # informational
+
+
 def _expr_rename_drift():
     drift = apply(
         "calculator", ["field_rename"], rng_for(7, "t", "schema_drift"), "field_rename"

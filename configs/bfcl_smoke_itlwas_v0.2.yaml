@@ -1,0 +1,36 @@
+# BFCL-100 smoke config (itlwas Mistral v0.2) — first 10 BFCL tasks, 1 trial.
+# Schema-match suite with simulated executor (see docs/protocol.md amendment).
+# Prerequisites: llama-cpp-python installed; GGUF at model.path (manual).
+
+experiment: upgradecanary-bfcl-smoke-itlwas-v0.2
+seed: 1234
+
+data: data/bfcl_tasks.jsonl
+output_dir: results
+task_limit: 10
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 1
+
+model:
+  provider: llama_cpp
+  path: models/itlwas/mistral-7b-instruct-v0.2-q4_k_m.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0
+  max_tokens: 256
+  seed: 1234
+  # No leading "<s>" — llama-cpp-python adds BOS automatically.
+  prompt_template: "[INST]\n{prompt}\n[/INST]"
+  stop: ["</s>"]
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true

@@ -252,6 +252,23 @@ the original suite, which includes enum drift.
 - The functional score is unchanged; `args_exact` remains diagnostic only.
 - Strict JSON parsing, `args_valid_under_drift`, and executor validation are
   unchanged (not weakened).
-- Canonical expected call = first acceptable value per argument
+- Canonical expected call = first non-empty acceptable value per argument
   (deterministic tie-break); the full acceptable-values map is stored per
-  task for audit, not for scoring.
+  task and used by `args_intent_match` as described in the amendment below.
+
+## BFCL acceptable-values intent amendment (dated 2026-09-30)
+
+- BFCL ground truth allows multiple acceptable values per parameter, and uses
+  `""` to mean that omitting the parameter is acceptable.
+- `args_intent_match` must respect these semantics for BFCL-derived tasks:
+  an expected parameter passes if it is present with any value from its
+  acceptable set, or omitted when the set contains `""`. Extra arguments are
+  tolerated for intent only when they are declared in the active schema or
+  part of the task's acceptable map (this covers `field_drop` remnants and
+  `unexpected_field` adaptation, which strict validity/execution already
+  gate). Required arguments with no `""` entry must still be present.
+- When no acceptable map is provided (synthetic suite), intent comparison is
+  exactly the pre-amendment behavior.
+- `args_valid_under_drift` and executor validation remain strict; strict JSON
+  parsing is unchanged; the functional score formula is unchanged. This
+  amendment changes intent semantics for BFCL tasks only.

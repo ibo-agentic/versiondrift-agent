@@ -251,6 +251,8 @@ configs/real_smoke_qwen25.yaml    Qwen2.5-7B smoke config (10 tasks, ChatML, spl
 configs/real_smoke_qwen3.yaml     Qwen3-8B smoke config (10 tasks, ChatML)
 configs/real_trials_qwen25.yaml   Qwen2.5-7B trials config (100 tasks x 3 trials, ChatML)
 configs/real_trials_qwen3.yaml    Qwen3-8B trials config (100 tasks x 3 trials, ChatML)
+configs/bfcl_smoke_itlwas_v0.2.yaml  BFCL-100 smoke config (10 tasks, Mistral v0.2)
+configs/bfcl_smoke_qwen3.yaml     BFCL-100 smoke config (10 tasks, Qwen3)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
 data/bfcl_tasks.jsonl       UpgradeCanary-BFCL-100 public suite (regenerate: python scripts/generate_bfcl_tasks.py)
 data/bfcl_tasks_provenance.jsonl  per-task BFCL provenance (source id, signature, seed)

@@ -163,13 +163,14 @@ def convert(record: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
     for pname, vals in truth_args.items():
         type_name = args_schema.get(pname, {}).get("type", "string")
         coerced = [_coerce_value(v, type_name) for v in vals]
-        # BFCL uses "" to mean "argument omitted"; drop such entries, and
-        # exclude parameters that are canonically absent from the expected call.
-        coerced = [v for v in coerced if v != ""]
-        if not coerced:
-            continue
+        # Keep "" entries: BFCL uses "" to mark omission-tolerant parameters.
+        # The canonical expected call uses the first non-empty value; a
+        # parameter whose only value is "" is canonically absent.
         acceptable[pname] = coerced
-        canonical[pname] = coerced[0]
+        real = [v for v in coerced if v != ""]
+        if not real:
+            continue
+        canonical[pname] = real[0]
     internal = {
         "name": fn["name"],
         "description": fn.get("description", ""),
