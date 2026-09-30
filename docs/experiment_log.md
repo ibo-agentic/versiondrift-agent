@@ -165,3 +165,34 @@ are exploratory until the noted harness fixes land.
   numbers: 40-task in-distribution canary at >= 0.95 accuracy; 10–20 task
   canaries selected on one upgrade pair classify the held-out pair with zero
   errors (leave-one-upgrade-out validation).
+
+## 2026-09-30 — Qwen2.5→Qwen3 paired results and cross-family gate validation
+
+- Runs: `..._qwen25_...T222007Z`, `..._qwen3_...T230135Z`; 900/900 matched.
+  Script: `scripts/analyze_version_trials.py`.
+- Qwen2.5 / Qwen3 pooled functional scores: baseline 1.00 / 1.00;
+  schema_drift 0.94 / 0.91 (diff −0.030, CI [−0.097, +0.037], n.s.);
+  runtime_fault 1.00 / 0.95 (diff −0.053, CI [−0.080, −0.027], significant).
+  Pooled stress diff −0.042 -> gate label: NEUTRAL (inside ±0.05).
+- Category story: Qwen3 fixes field_drop completely (0.40->1.00, +18 flips)
+  but collapses on unexpected_field (1.00->0.13, −26 flips) and slips on
+  empty_result recovery (1.00->0.79). Qwen2.5 is more consistent (mean
+  per-task range 0.027 vs 0.070).
+- Cross-family gate validation (`scripts/validate_cross_family_gate.py`):
+  Test A — canaries selected on the two Mistral pairs, evaluated on
+  Qwen2.5→Qwen3: sign always correct, but at k=10–30 the amplified canary
+  diff (−0.13…−0.08) mislabels the borderline-neutral truth (−0.042) as
+  harmful; only k=40 returns neutral. Test B — canaries selected on the Qwen
+  pair evaluated on Mistral: v0.1→v0.2 flagged harmful correctly at all k
+  (|diff| percentile 1.00 vs random); v0.2→v0.3 flagged beneficial correctly
+  at all k. Random-subset baselines trailed selected canaries in every cell.
+- Conclusions: Qwen2.5→Qwen3 is NEUTRAL overall with a real trade underneath
+  (big field_drop gain, unexpected_field regression); task informativeness
+  transfers Mistral->Qwen and Qwen->Mistral for sign and strong effects, but
+  high-|diff| canaries amplify deviations and can mislabel borderline-neutral
+  upgrades at small k — use k>=40 (or magnitude recalibration) for
+  neutral/harmful discrimination cross-family.
+- Limitations: one upgrade pair per family direction; the neutral truth sits
+  0.008 from the harmful threshold (inherently unstable label); thresholds
+  post hoc; canary |diff| is inflated by design and must not be read as an
+  effect-size estimate.
