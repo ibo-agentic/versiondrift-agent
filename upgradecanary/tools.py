@@ -108,12 +108,23 @@ def validate_call(
     return problems
 
 
+def simulated_result(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic simulated result for tools without a canned handler.
+
+    Used by BFCL-derived tasks: argument validation has already happened in
+    ``execute``; the result echoes the canonical call so outcomes stay
+    reproducible and audit-able.
+    """
+    return {"simulated": True, "tool": tool_name, "arguments": arguments}
+
+
 def execute(
     call: dict[str, Any],
     schema: dict[str, Any],
     drift: Drift | None,
     fault: Fault | None,
     strict: bool,
+    canonical_schema: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate, canonicalize, invoke the handler, and apply the fault."""
     name = call.get("name", "")
@@ -121,8 +132,10 @@ def execute(
     problems = validate_call(name, arguments, schema, strict)
     if problems:
         return {"ok": False, "error": {"type": "validation", "problems": problems}}
-    canonical = to_canonical_args(arguments, drift, BASE_SCHEMAS.get(name))
-    result = HANDLERS[name](**canonical)
+    base = canonical_schema or BASE_SCHEMAS.get(name)
+    canonical = to_canonical_args(arguments, drift, base)
+    handler = HANDLERS.get(name)
+    result = handler(**canonical) if handler else simulated_result(name, canonical)
     return apply_fault(name, result, fault)
 
 

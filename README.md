@@ -159,6 +159,26 @@ python -m upgradecanary.runner --config configs/real_trials_v0.2.yaml
 python -m upgradecanary.runner --config configs/real_trials_v0.3.yaml
 ```
 
+## UpgradeCanary-BFCL-100 (public-suite phase)
+
+`data/bfcl_tasks.jsonl` is a 100-task public suite derived from the BFCL
+`simple_python` category (Berkeley Function Calling Leaderboard, Apache-2.0).
+It is **BFCL-derived, not full BFCL**: a schema-match suite with a generic
+simulated deterministic executor — no executable BFCL coverage is claimed,
+and results are not comparable to BFCL leaderboard numbers. Selection is
+metadata-only under the frozen protocol in `docs/protocol.md` (fixed seed
+**20260930**, stratified by parameter-type signature, eligibility rules
+listed there); `enum_drift` is excluded in this phase because BFCL
+`simple_python` has no enum schemas. Per-task provenance (source BFCL id,
+signature, seed) is in `data/bfcl_tasks_provenance.jsonl`. Regenerate with:
+
+```bash
+python scripts/generate_bfcl_tasks.py
+```
+
+(requires the BFCL checkout at `external/gorilla/`, which is gitignored and
+not committed).
+
 ## Tests
 
 ```bash
@@ -232,8 +252,13 @@ configs/real_smoke_qwen3.yaml     Qwen3-8B smoke config (10 tasks, ChatML)
 configs/real_trials_qwen25.yaml   Qwen2.5-7B trials config (100 tasks x 3 trials, ChatML)
 configs/real_trials_qwen3.yaml    Qwen3-8B trials config (100 tasks x 3 trials, ChatML)
 data/base_tasks.jsonl       100 deterministic tool-use tasks (regenerate: python scripts/generate_tasks.py)
+data/bfcl_tasks.jsonl       UpgradeCanary-BFCL-100 public suite (regenerate: python scripts/generate_bfcl_tasks.py)
+data/bfcl_tasks_provenance.jsonl  per-task BFCL provenance (source id, signature, seed)
 docs/experiment_log.md      dated run notes and harness-fairness decisions
+docs/model_manifest.md      model files, sizes, SHA-256, sources, configs
+docs/protocol.md            frozen experiment protocol (main track)
 scripts/generate_tasks.py   deterministic task-file generator
+scripts/generate_bfcl_tasks.py  BFCL-100 generator (frozen selection rules)
 tests/                      pytest suite (python -m pytest -q)
 upgradecanary/
   runner.py                 experiment loop + result writing (python -m upgradecanary.runner)

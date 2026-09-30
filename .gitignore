@@ -1,5 +1,6 @@
 results/
 models/
+external/
 .venv/
 venv/
 __pycache__/

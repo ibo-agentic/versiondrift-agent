@@ -9,14 +9,19 @@ from pathlib import Path
 import pytest
 import yaml
 
+from upgradecanary import bfcl as bfcl_mod
 from upgradecanary import runner
+from upgradecanary.bfcl import is_eligible
 from upgradecanary.evaluator import evaluate
+from upgradecanary.perturbations.runtime_faults import Fault
 from upgradecanary.perturbations.schema_drift import (
     apply,
     drifted_schema,
     expressions_equivalent,
+    generate_specs_from_schema,
     to_canonical_args,
 )
+from upgradecanary.tasks import load_tasks
 from upgradecanary.tools import BASE_SCHEMAS, execute, validate_call
 from upgradecanary.utils import rng_for
 
@@ -226,6 +231,107 @@ def test_trial_config_validation():
         runner.build_trials(base)
     ok = runner.build_trials({"trials": 2, "model": {"temperature": 0.0, "seed": 9}})
     assert ok == [{"temperature": 0.0, "seed": 9}] * 2
+
+
+def _mini_bfcl_record(question, fn_name="calc_area", props=None, required=None):
+    props = props or {"base": {"type": "integer"}, "height": {"type": "integer"}}
+    required = required if required is not None else ["base", "height"]
+    return {
+        "id": "simple_python_999",
+        "question": [[{"role": "user", "content": question}]],
+        "function": [{
+            "name": fn_name,
+            "description": "demo",
+            "parameters": {"type": "dict", "properties": props, "required": required},
+        }],
+    }
+
+
+def _mini_bfcl_answer(args=None):
+    args = args or {"base": [10], "height": [5]}
+    return {"id": "simple_python_999", "ground_truth": [{"calc_area": args}]}
+
+
+def test_bfcl_eligibility_rules():
+    rec = _mini_bfcl_record(
+        "Find the area of a triangle with a base of 10 units and height of 5 units."
+    )
+    ans = _mini_bfcl_answer()
+    assert is_eligible(rec, ans) == (True, "ok")
+    assert not is_eligible(rec, None)[0]                                    # rule 2
+    two_fns = _mini_bfcl_record(
+        "Find the area of a triangle with a base of 10 units and height of 5 units."
+    )
+    two_fns["function"].append(two_fns["function"][0])
+    assert not is_eligible(two_fns, ans)[0]                                 # rule 3
+    assert not is_eligible(rec, _mini_bfcl_answer({"base": [10], "height": [[5]]}))[0]  # rule 9
+    short = _mini_bfcl_record("How big? too short.")
+    assert not is_eligible(short, _mini_bfcl_answer())[0]                   # rule 6
+    with_url = _mini_bfcl_record(
+        "Find the area of a triangle with a base of 10 units see http://x.co and height of 5."
+    )
+    assert not is_eligible(with_url, ans)[0]                                # rule 7
+    ungrounded = _mini_bfcl_record(
+        "Find the area of a triangle with a base of 10 units and height of 5 units.",
+        props={"base": {"type": "integer"}, "secret": {"type": "integer"}},
+        required=["base", "secret"],
+    )
+    assert not is_eligible(ungrounded, _mini_bfcl_answer({"base": [10], "secret": [99]}))[0]  # rule 8
+
+
+def test_bfcl_selection_deterministic(tmp_path):
+    stats = bfcl_mod.generate(tmp_path)
+    assert stats["selected"] == 100
+    assert stats["eligible"] >= 100
+    first = (tmp_path / "bfcl_tasks.jsonl").read_text(encoding="utf-8")
+    bfcl_mod.generate(tmp_path)  # regeneration must be byte-identical
+    assert (tmp_path / "bfcl_tasks.jsonl").read_text(encoding="utf-8") == first
+    ids = [json.loads(line)["task_id"] for line in first.splitlines()]
+    assert len(ids) == len(set(ids)) == 100
+
+
+def test_bfcl_conversion_and_no_enum_drift(tmp_path):
+    bfcl_mod.generate(tmp_path)
+    tasks = load_tasks(tmp_path / "bfcl_tasks.jsonl")
+    assert len(tasks) == 100
+    for task in tasks:
+        assert task.suite == "bfcl" and task.source_id
+        assert task.tool_schema and task.internal_schema and task.acceptable
+        assert validate_call(
+            task.expected_call["name"], task.expected_call["arguments"],
+            task.internal_schema, strict=False,
+        ) == []
+        for key, value in task.expected_call["arguments"].items():
+            assert value in task.acceptable[key]
+        specs = generate_specs_from_schema(task.internal_schema)
+        assert specs and all(s["type"] != "enum_drift" for s in specs)
+        drift = apply(
+            task.tool,
+            ["field_rename", "field_drop", "type_mutation", "unexpected_field", "enum_drift"],
+            rng_for(1, task.task_id, "schema_drift"),
+            schema=task.internal_schema,
+        )
+        assert drift is None or drift.type != "enum_drift"
+
+
+def test_simulated_handler_determinism(tmp_path):
+    bfcl_mod.generate(tmp_path)
+    task = load_tasks(tmp_path / "bfcl_tasks.jsonl")[0]
+    schema = drifted_schema(task.internal_schema, None)
+    r1 = execute(task.expected_call, schema, None, None, True, canonical_schema=task.internal_schema)
+    r2 = execute(task.expected_call, schema, None, None, True, canonical_schema=task.internal_schema)
+    assert r1 == r2
+    assert r1["ok"] is True and r1["result"]["simulated"] is True
+    r3 = execute(task.expected_call, schema, None, Fault("timeout"), False,
+                 canonical_schema=task.internal_schema)
+    assert r3["ok"] is False  # fault machinery applies to simulated tools too
+
+
+def test_synthetic_loader_unchanged():
+    tasks = load_tasks(ROOT / "data" / "base_tasks.jsonl")
+    assert len(tasks) == 100
+    assert all(t.suite == "synthetic" for t in tasks)
+    assert all(t.internal_schema is None for t in tasks)
 
 
 def _expr_rename_drift():

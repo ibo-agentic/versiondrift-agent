@@ -2,7 +2,10 @@
 
 Each task-condition is repeated for every configured trial (``trials``,
 ``trial_temperatures``, ``trial_seeds``; default 1 trial using the model's
-temperature/seed). Writes four artifacts per run under results/<run_id>/:
+temperature/seed). Synthetic tasks draw schemas from the global registry;
+BFCL-derived tasks (``suite == "bfcl"``) carry their own schemas and are
+rendered to the model in BFCL-native form. Writes four artifacts per run
+under results/<run_id>/:
 - run_manifest.json    config snapshot, seed, versions, trial count
 - raw_outputs.jsonl    prompt + raw model text (and retry attempt) per record,
                        with trial_index/temperature/seed
@@ -36,7 +39,14 @@ from .utils import run_id, sha256_text, utc_now_iso, write_json, write_jsonl, rn
 
 
 def build_prompt(task: Task, schema: dict[str, Any]) -> str:
-    tool_json = json.dumps({"tools": [schema]}, indent=2, sort_keys=True)
+    # BFCL-derived tasks render the native upstream function document so the
+    # model sees the same schema shape as in the source benchmark; synthetic
+    # tasks render our internal schema.
+    native = getattr(task, "tool_schema", None)
+    if getattr(task, "suite", "synthetic") == "bfcl" and native is not None:
+        tool_json = json.dumps({"tools": [native]}, indent=2, sort_keys=True)
+    else:
+        tool_json = json.dumps({"tools": [schema]}, indent=2, sort_keys=True)
     return (
         "You are an agent that answers questions by calling tools.\n"
         f"Available tool schema:\n{tool_json}\n"
@@ -48,7 +58,7 @@ def build_prompt(task: Task, schema: dict[str, Any]) -> str:
     )
 
 
-def _safe_execute(parsed, schema, drift, fault, strict) -> dict[str, Any]:
+def _safe_execute(parsed, schema, drift, fault, strict, canonical_schema=None) -> dict[str, Any]:
     """Execute a parsed call, converting any failure into a structured result."""
     if parsed is None:
         return {
@@ -59,7 +69,7 @@ def _safe_execute(parsed, schema, drift, fault, strict) -> dict[str, Any]:
             },
         }
     try:
-        return execute(parsed, schema, drift, fault, strict)
+        return execute(parsed, schema, drift, fault, strict, canonical_schema=canonical_schema)
     except Exception as exc:  # handler blew up (e.g. unknown canned key)
         return {
             "ok": False,
@@ -89,6 +99,13 @@ def build_trials(cfg: dict[str, Any]) -> list[dict[str, Any]]:
             f"and trial_seeds has {len(seeds)}"
         )
     return [{"temperature": float(t), "seed": int(s)} for t, s in zip(temps, seeds)]
+
+
+def task_base_schema(task: Task) -> dict[str, Any]:
+    """Canonical schema for a task: per-task for BFCL, registry for synthetic."""
+    if task.suite == "bfcl" and task.internal_schema is not None:
+        return task.internal_schema
+    return BASE_SCHEMAS[task.tool]
 
 
 def run(config_path: str) -> dict[str, Any]:
@@ -125,11 +142,15 @@ def run(config_path: str) -> dict[str, Any]:
             drift = None
             fault = None
             if condition == "schema_drift":
-                drift = apply_drift(task.tool, drift_enabled, rng, task.drift_type)
+                drift = apply_drift(
+                    task.tool, drift_enabled, rng, task.drift_type,
+                    schema=task_base_schema(task),
+                )
             elif condition == "runtime_fault":
                 fault = choose_fault(fault_enabled, rng)
 
-            schema = drifted_schema(BASE_SCHEMAS[task.tool], drift)
+            base_schema = task_base_schema(task)
+            schema = drifted_schema(base_schema, drift)
             strict = strict_baseline and condition == "baseline"
             prompt = build_prompt(task, schema)
             base_context = {"task": task, "condition": condition, "drift": drift}
@@ -143,7 +164,9 @@ def run(config_path: str) -> dict[str, Any]:
                     prompt, context, temperature=temperature, seed=trial_seed
                 )
                 parsed = extract_tool_call(raw)
-                exec_result = _safe_execute(parsed, schema, drift, fault, strict)
+                exec_result = _safe_execute(
+                    parsed, schema, drift, fault, strict, canonical_schema=base_schema
+                )
 
                 recovered: bool | None = None
                 retry_prompt = None
@@ -168,7 +191,10 @@ def run(config_path: str) -> dict[str, Any]:
                         seed=trial_seed,
                     )
                     retry_parsed = extract_tool_call(retry_raw)
-                    retry_exec = _safe_execute(retry_parsed, schema, drift, None, strict)
+                    retry_exec = _safe_execute(
+                        retry_parsed, schema, drift, None, strict,
+                        canonical_schema=base_schema,
+                    )
                     recovered = bool(retry_exec.get("ok"))
                     exec_result = {
                         "first_attempt": exec_result,

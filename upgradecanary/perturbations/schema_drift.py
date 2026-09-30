@@ -123,22 +123,59 @@ class Drift:
     params: dict[str, Any] = field(default_factory=dict)
 
 
+def generate_specs_from_schema(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    """Derive drift candidates from any canonical schema by fixed rules.
+
+    Used for tools without hand-written specs (e.g. BFCL-derived tasks). Only
+    drift types that need no semantic knowledge of the tool are generated —
+    never enum_drift, which requires real enums the schema may not have.
+    """
+    args = schema.get("args", {})
+    specs: list[dict[str, Any]] = []
+    required = sorted(k for k, s in args.items() if s.get("required"))
+    optional = sorted(k for k, s in args.items() if not s.get("required"))
+    integers = sorted(k for k, s in args.items() if s.get("type") == "integer")
+    if required:
+        specs.append({"type": "field_rename", "field": required[0], "new_name": f"{required[0]}_v2"})
+    elif args:
+        first = sorted(args)[0]
+        specs.append({"type": "field_rename", "field": first, "new_name": f"{first}_v2"})
+    if optional:
+        specs.append({"type": "field_drop", "field": optional[0]})
+    if integers:
+        specs.append({"type": "type_mutation", "field": integers[0], "new_type": "string"})
+    specs.append(
+        {
+            "type": "unexpected_field",
+            "field": "verbose",
+            "spec": {"type": "boolean", "required": True, "default": True},
+        }
+    )
+    return specs
+
+
 def apply(
     tool_name: str,
     enabled_types: list[str],
     rng: random.Random,
     preferred_type: str | None = None,
+    schema: dict[str, Any] | None = None,
 ) -> Drift | None:
     """Pick one applicable drift for the tool, or None if nothing applies.
 
     ``preferred_type`` is a per-task stratification hint: when the tool has a
     candidate of that type it is used (the seeded RNG still makes the pick, so
     behavior stays reproducible); otherwise the choice falls back to all
-    applicable candidates.
+    applicable candidates. Tools without hand-written specs (e.g. BFCL tasks)
+    get candidates derived from ``schema`` by fixed rules.
     """
     candidates = [
         spec for spec in _SPECS.get(tool_name, []) if spec["type"] in enabled_types
     ]
+    if not candidates and schema is not None:
+        candidates = [
+            spec for spec in generate_specs_from_schema(schema) if spec["type"] in enabled_types
+        ]
     if not candidates:
         return None
     if preferred_type is not None:

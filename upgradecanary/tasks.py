@@ -25,6 +25,13 @@ class Task:
     # schema_drift condition (must be applicable to the tool; falls back to a
     # seeded RNG choice when absent or inapplicable).
     drift_type: str | None = None
+    # Task-suite marker. "synthetic" (default) uses the global BASE_SCHEMAS;
+    # "bfcl" carries its own schemas below (UpgradeCanary-BFCL-100).
+    suite: str = "synthetic"
+    tool_schema: dict[str, Any] | None = None      # BFCL-native function doc
+    internal_schema: dict[str, Any] | None = None  # converted canonical schema
+    acceptable: dict[str, Any] | None = None       # acceptable values per arg
+    source_id: str | None = None                   # upstream task id
 
 
 def load_tasks(path: str | Path) -> list[Task]:
@@ -37,6 +44,11 @@ def load_tasks(path: str | Path) -> list[Task]:
             expected_call=row["expected_call"],
             condition_tags=row.get("condition_tags", []),
             drift_type=row.get("drift_type"),
+            suite=row.get("suite", "synthetic"),
+            tool_schema=row.get("tool_schema"),
+            internal_schema=row.get("internal_schema"),
+            acceptable=row.get("acceptable"),
+            source_id=row.get("source_id"),
         )
         for row in rows
     ]

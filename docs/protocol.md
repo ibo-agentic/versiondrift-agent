@@ -209,3 +209,49 @@ phase. Later changes to metrics, thresholds, selection rules, hypotheses, or
 analysis plans must be recorded in `docs/experiment_log.md` as dated
 deviations with rationale; results produced under a prior protocol must be
 re-tagged with the protocol version they followed.
+
+## UpgradeCanary-BFCL-100 selection protocol (amendment)
+
+This section is a dated amendment to the frozen protocol above and a
+documented deviation from the original fully-synthetic suite.
+
+### Source
+- data source: `external/gorilla/berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_simple_python.json`
+- answer source: `external/gorilla/berkeley-function-call-leaderboard/bfcl_eval/data/possible_answer/BFCL_v4_simple_python.json`
+
+### Eligibility rules
+A task is eligible only if:
+1. it comes from `BFCL_v4_simple_python.json`
+2. the `possible_answer` record exists for the same id
+3. it has exactly one function
+4. it has exactly one expected call
+5. the question is printable ASCII
+6. the question length is between 20 and 400 characters
+7. the question contains no URL or `http` substring
+8. every required argument is either grounded in the question text, or has an explicit default
+9. all expected argument values are scalar: string, number, or boolean
+10. the rendered prompt is under 1200 characters
+11. duplicate function names are removed by keeping the first eligible occurrence
+
+### Sampling rule
+- select exactly 100 eligible tasks
+- seeded stratified sample; strata = parameter-type signature
+- fixed seed: **20260930**
+- selection depends only on task metadata and never on model outputs
+
+### Drift restriction (deviation from the synthetic suite)
+For the BFCL-derived phase, use only: `field_rename`, `field_drop`,
+`type_mutation`, `unexpected_field`. `enum_drift` is excluded because BFCL
+`simple_python` provides no enum schemas. This is a logged deviation from
+the original suite, which includes enum drift.
+
+### Scoring and execution model
+- This is a BFCL-derived **schema-match** suite; execution uses a generic
+  simulated deterministic executor. No claim of full executable BFCL coverage
+  is made.
+- The functional score is unchanged; `args_exact` remains diagnostic only.
+- Strict JSON parsing, `args_valid_under_drift`, and executor validation are
+  unchanged (not weakened).
+- Canonical expected call = first acceptable value per argument
+  (deterministic tie-break); the full acceptable-values map is stored per
+  task for audit, not for scoring.
