@@ -196,3 +196,38 @@ are exploratory until the noted harness fixes land.
   0.008 from the harmful threshold (inherently unstable label); thresholds
   post hoc; canary |diff| is inflated by design and must not be read as an
   effect-size estimate.
+
+## 2026-09-30 — Threshold sensitivity and canary calibration
+
+- Script: `scripts/analyze_gate_threshold_sensitivity.py`. Four decisions
+  (M12 −0.168 harmful; M23 +0.123 beneficial; M13 −0.045 neutral; Q −0.042
+  neutral), canaries selected by cross-pair informativeness (leave-one-out),
+  thresholds 0.01–0.10, k = 10–50.
+- Key structural finding: informativeness-selected canaries AMPLIFY the
+  difference (canary |diff| ~2–2.5x full-suite), so a fixed ±0.05 threshold
+  overflags the two borderline-neutral truths at small k (accuracy 0.25–0.75
+  at t=0.05, overflag up to 0.5). Stable raw operating region: t in
+  [0.01, 0.03] for all k (accuracy 1.00, FA/FR/overflag 0, sign 1.00),
+  extending to t=0.04 at k=20–30. Sign accuracy is 1.00 at every (k, t).
+- Calibration (full ~ alpha * canary, LOUO): alpha is consistent at
+  0.35–0.51 across decisions. Magnitude MAE improves 3–10x (raw 0.085–0.139
+  -> LOUO-cal 0.007–0.046). Calibrated decisions at the conventional t=0.05:
+  accuracy 0.50 -> 0.75–1.00 (k>=20); at t=0.08: 1.00. Family transfer:
+  alpha(Mistral->Qwen) = 0.38–0.41 (stable, 3 training decisions);
+  alpha(Qwen->Mistral) = 0.42–1.11 (unstable, single training decision) —
+  one-way reliability only.
+- Best configuration: k=30, trials=3 (1 greedy + 2 sampled). With
+  calibration, gate at +-0.05 on the calibrated estimate; without
+  calibration, use t in [0.01, 0.03].
+- Recommended release-gate protocol: (1) select 30 canary tasks by
+  cross-pair informativeness from historical decisions with category
+  coverage; (2) run 1 greedy + 2 sampled trials per task on old/new models;
+  (3) shrink the canary difference by alpha (~0.4) calibrated from >=3 prior
+  decisions; (4) gate: harmful < -0.05, beneficial > +0.05 on the calibrated
+  estimate, with sign check; (5) for neutral verdicts, always attach the
+  per-category breakdown (neutral hides trades, e.g. Qwen3's field_drop gain
+  vs unexpected_field regression); (6) report magnitudes only from the full
+  suite, never from the canary.
+- Limitations: only four decisions (two borderline-neutral); alpha estimated
+  from the same suite it is applied to; thresholds still post hoc (though
+  now sensitivity-bounded); calibration transfer demonstrated one-way.

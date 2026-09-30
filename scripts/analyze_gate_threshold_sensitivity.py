@@ -181,7 +181,8 @@ def main(argv: list[str]) -> None:
         mae_raw = sum(abs(canary_diff[x] - full[x]) for x in names) / len(names)
         mae_loup = sum(abs(loup_pred[x] - full[x]) for x in names) / len(names)
         mae_fam = (sum(abs(fam_pred_m[x] - full[x]) for x in fam_train_m) + abs(fam_pred_q - full["Qwen2.5->Qwen3"])) / len(names)
-        print(f"  calibration: LOUO alphas={ {x.split()[1]: round(loup_alphas[x], 2) for x in names} } "
+        short = {"M v0.1->v0.2": "M12", "M v0.2->v0.3": "M23", "M v0.1->v0.3": "M13", "Qwen2.5->Qwen3": "Q"}
+        print(f"  calibration: LOUO alphas={ {short[x]: round(loup_alphas[x], 2) for x in names} } "
               f"alpha(Mistral->Qwen)={alpha_m:.2f} alpha(Qwen->Mistral)={alpha_q:.2f}")
         print(f"  magnitude MAE: raw={mae_raw:.3f} LOUO-cal={mae_loup:.3f} family-cal={mae_fam:.3f}")
         for t in (0.03, 0.05, 0.08):
