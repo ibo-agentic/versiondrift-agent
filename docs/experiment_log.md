@@ -344,3 +344,45 @@ are exploratory until the noted harness fixes land.
   for every drift type and that prompt schema == evaluator schema. Parser,
   evaluator, perturbations, and scoring unchanged. BFCL drift reruns required
   before any public-suite drift claims.
+
+## 2026-10-01 — Corrected BFCL-100 results (post-fix runs; authoritative)
+
+- Corrected runs: v0.1 T142620Z, v0.2 T151819Z, v0.3 T160749Z, qwen25
+  T162536Z, qwen3 T190657Z; 900/900 matched. Pre-fix BFCL runs excluded.
+  The pre-fix conclusions in the 2026-10-01 entry above remain WITHDRAWN;
+  the numbers below supersede them. `scripts/analyze_cross_suite.py`
+  updated (defaults = corrected runs; accepts run-dir overrides).
+- Public-suite scores (baseline/drift/fault/stress): v0.1 0.89/0.69/0.88/0.79;
+  v0.2 0.81/0.62/0.72/0.67; v0.3 0.94/0.78/0.94/0.86; qwen25 0.95/0.92/0.95/0.94;
+  qwen3 0.85/0.69/0.72/0.71. Drift adaptation is real (0.62-0.92), not the
+  pre-fix "floor".
+- Decisions (stress diff, task-cluster CI): v0.1->v0.2 -0.115 [-.182,-.050]
+  harmful (114/45); v0.2->v0.3 +0.187 [+.133,+.243] beneficial (13/125);
+  v0.1->v0.3 +0.072 beneficial (was "neutral" pre-fix); Qwen2.5->Qwen3
+  -0.230 [-.282,-.180] harmful (152/14), worse than pre-fix suggested.
+  Category drivers: v0.3 gains on unexpected_field (+0.22) and fault
+  recovery; Qwen3 collapses on unexpected_field (-0.39, 43/1 neg flips).
+- Consistency: qwen25 most stable (range 0.033), then v0.3 0.057, v0.1 0.140,
+  v0.2 0.193, qwen3 worst 0.373.
+- Synthetic vs BFCL (corrected): synthetic still overestimates stress
+  (gap 0.16-0.28; drift gap 0.15-0.30) but far less than the invalid
+  pre-fix claim. Rankings: synthetic [v0.1, q25, v0.3, q3, m2] vs BFCL
+  [q25, v0.3, v0.1, q3, m2] — 2/5 positions; the BOTTOM two (q3, m2) agree
+  across suites; top order does not. Replicating: v0.2 regression, v0.3
+  recovery, Qwen3 as robustness downgrade, Qwen2.5 excellent on public tasks.
+- Gate validation on corrected BFCL: H1 SUPPORTED (non-monotonic, CIs
+  exclude zero, both suites). H2 NOT supported on BFCL (no neutral decisions
+  after correction; synthetic Qwen neutral-swap stands as single-suite
+  evidence). H3 SUPPORTED at k>=30 (1.00; 0.75 at k<=20). H4 PARTIAL: at
+  k=10-20 clean-only and drift-only ablations match/beat the mixed canary
+  (all 1.00 vs selected 0.75); parity at k>=30 — single-condition canaries
+  suffice when per-condition effects are strong. H5: magnitude improves
+  (MAE 0.10 -> 0.065-0.09 at k=30-40); decision accuracy neutral (raw
+  already strong; shrinkage occasionally hurts at t=0.05).
+- Cross-suite transfer (category-level, corrected): symmetric and strong —
+  synthetic->BFCL 1.00 at k>=20; BFCL->synthetic 0.75 at k>=20 (0.50 at
+  k=10). The pre-fix asymmetry was an artifact of the bug.
+- Final H1-H5 status across both suites: H1 supported (both). H2 supported
+  on synthetic only. H3 supported on both (k-dependent). H4 supported on
+  synthetic; partial on BFCL. H5 magnitude supported on both; decisions
+  neutral on both.

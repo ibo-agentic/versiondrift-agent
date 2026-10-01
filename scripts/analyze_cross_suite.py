@@ -32,11 +32,11 @@ DECISIONS = [("v0.1->v0.2", "m1", "m2"), ("v0.2->v0.3", "m2", "m3"),
              ("v0.1->v0.3", "m1", "m3"), ("Qwen2.5->Qwen3", "q25", "q3")]
 
 BFCL_RUNS = {
-    "m1": r"results\upgradecanary-bfcl-trials-itlwas-v0.1_seed1234_20261001T042558Z",
-    "m2": r"results\upgradecanary-bfcl-trials-itlwas-v0.2_seed1234_20261001T045510Z",
-    "m3": r"results\upgradecanary-bfcl-trials-itlwas-v0.3_seed1234_20261001T051347Z",
-    "q25": r"results\upgradecanary-bfcl-trials-qwen25_seed1234_20261001T053040Z",
-    "q3": r"results\upgradecanary-bfcl-trials-qwen3_seed1234_20261001T054551Z",
+    "m1": r"results\upgradecanary-bfcl-trials-itlwas-v0.1_seed1234_20261001T142620Z",
+    "m2": r"results\upgradecanary-bfcl-trials-itlwas-v0.2_seed1234_20261001T151819Z",
+    "m3": r"results\upgradecanary-bfcl-trials-itlwas-v0.3_seed1234_20261001T160749Z",
+    "q25": r"results\upgradecanary-bfcl-trials-qwen25_seed1234_20261001T162536Z",
+    "q3": r"results\upgradecanary-bfcl-trials-qwen3_seed1234_20261001T190657Z",
 }
 SYN_RUNS = {
     "m1": r"results\upgradecanary-real-trials-itlwas-v0.1_seed1234_20260929T120210Z",
@@ -128,9 +128,15 @@ def suite_context(runs):
 
 
 def main() -> None:
+    import sys
+
     rng = random.Random(BOOT_SEED)
     print("loading runs...")
-    bfcl = {m: load_run(d) for m, d in BFCL_RUNS.items()}
+    cli = sys.argv[1:]
+    if cli and len(cli) != len(MODELS):
+        raise SystemExit("usage: analyze_cross_suite.py [BFCL run dirs: m1 m2 m3 q25 q3]")
+    bfcl_dirs = dict(zip(MODELS, cli)) if cli else BFCL_RUNS
+    bfcl = {m: load_run(d) for m, d in bfcl_dirs.items()}
     syn = {m: load_run(d) for m, d in SYN_RUNS.items()}
     (b_common, b_tasks, b_by_task, b_stress, b_by_task_stress, b_cat) = suite_context(bfcl)
     (s_common, s_tasks, s_by_task, s_stress, s_by_task_stress, s_cat) = suite_context(syn)
