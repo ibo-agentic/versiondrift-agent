@@ -11,7 +11,7 @@ import yaml
 
 from upgradecanary import bfcl as bfcl_mod
 from upgradecanary import runner
-from upgradecanary.bfcl import is_eligible
+from upgradecanary.bfcl import is_eligible, to_native_doc
 from upgradecanary.evaluator import evaluate
 from upgradecanary.perturbations.runtime_faults import Fault
 from upgradecanary.perturbations.schema_drift import (
@@ -406,6 +406,86 @@ def test_bfcl_conversion_preserves_omission_markers(tmp_path):
             assert value != "" and value in task.acceptable[key]
     n_omit = sum(1 for t in tasks if any("" in v for v in t.acceptable.values()))
     print(f"omission-tolerant tasks: {n_omit}")  # informational
+
+
+def _mk_bfcl_task():
+    from upgradecanary.tasks import Task
+
+    native = {
+        "name": "calc_area",
+        "description": "Calculate area.",
+        "parameters": {
+            "type": "dict",
+            "properties": {
+                "base": {"type": "integer", "description": "The base."},
+                "height": {"type": "integer", "description": "The height."},
+                "unit": {"type": "string", "description": "The unit.", "default": "units"},
+            },
+            "required": ["base", "height"],
+        },
+    }
+    internal = {
+        "name": "calc_area",
+        "description": "Calculate area.",
+        "args": {
+            "base": {"type": "integer", "required": True},
+            "height": {"type": "integer", "required": True},
+            "unit": {"type": "string", "required": False},
+        },
+    }
+    return Task(
+        task_id="bfcl-test", prompt="Find the area with base 10 and height 5.",
+        tool="calc_area",
+        expected_call={"name": "calc_area", "arguments": {"base": 10, "height": 5}},
+        condition_tags=["baseline", "schema_drift", "runtime_fault"],
+        suite="bfcl", tool_schema=native, internal_schema=internal,
+        acceptable={"base": [10], "height": [5]}, source_id="test",
+    )
+
+
+def test_to_native_doc_baseline_roundtrip():
+    task = _mk_bfcl_task()
+    # canonical (baseline) internal schema must reconstruct the native doc exactly
+    assert to_native_doc(task.internal_schema, task.tool_schema) == task.tool_schema
+
+
+def test_build_prompt_shows_drift_for_all_types():
+    task = _mk_bfcl_task()
+    cases = {
+        "field_rename": ("base", '"base_v2"'),
+        "field_drop": ("unit", None),
+        "type_mutation": ("base", None),
+        "unexpected_field": ("verbose", '"verbose"'),
+    }
+    for drift_type, (field, must_contain) in cases.items():
+        drift = apply("calc_area", [drift_type], rng_for(5, "t", drift_type),
+                      drift_type, schema=task.internal_schema)
+        drifted = drifted_schema(task.internal_schema, drift)
+        prompt = runner.build_prompt(task, drifted)
+        if drift_type == "field_rename":
+            assert '"base_v2"' in prompt
+        elif drift_type == "field_drop":
+            assert '"unit"' not in prompt  # dropped optional argument gone
+        elif drift_type == "type_mutation":
+            block = prompt[prompt.find('"base"'):prompt.find('"base"') + 120]
+            assert '"type": "string"' in block  # mutated type shown
+        elif drift_type == "unexpected_field":
+            assert '"verbose"' in prompt  # new required field shown
+        rendered = json.dumps({"tools": [to_native_doc(drifted, task.tool_schema)]},
+                              indent=2, sort_keys=True)
+        assert rendered in prompt  # prompt/evaluator schema consistency
+
+
+def test_prompt_evaluator_schema_consistency_all_tasks(tmp_path):
+    """The schema doc rendered into the prompt must be the native form of the
+    very schema object the evaluator/executor receive (drift included)."""
+    bfcl_mod.generate(tmp_path)
+    for task in load_tasks(tmp_path / "bfcl_tasks.jsonl"):
+        schema = drifted_schema(task.internal_schema, None)
+        prompt = runner.build_prompt(task, schema)
+        rendered = json.dumps({"tools": [to_native_doc(schema, task.tool_schema)]},
+                              indent=2, sort_keys=True)
+        assert rendered in prompt
 
 
 def _expr_rename_drift():

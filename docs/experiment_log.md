@@ -279,3 +279,68 @@ are exploratory until the noted harness fixes land.
   (1 greedy + 2 sampled, seeds 1234/1235/1236), all other settings matched
   to the frozen protocol. Analysis: reuse `scripts/analyze_version_trials.py`
   (pairs within/between families) and the gate validators after the runs.
+
+## 2026-10-01 — BFCL-100 full runs: cross-suite and public-suite analysis
+
+- Runs: all five BFCL trials configs completed (v0.1 T042558Z, v0.2 T045510Z,
+  v0.3 T051347Z, qwen25 T053040Z, qwen3 T054551Z); 900/900 matched. Script:
+  `scripts/analyze_cross_suite.py`.
+- Public-suite results (pooled functional scores; stress = mean(drift,fault)):
+  baseline 0.89/0.81/0.94/0.95/0.85; schema_drift 0.22/0.19/0.24/0.22/0.19;
+  runtime_fault 0.88/0.72/0.94/0.95/0.73; stress 0.55/0.46/0.59/0.58/0.46
+  (v0.1/v0.2/v0.3/qwen25/qwen3). Drift adaptation is at the floor for ALL
+  models on rename/unexpected_field; field_drop and fault recovery carry the
+  signal.
+- Decisions (task-cluster CIs): v0.1->v0.2 stress -0.097 [-.153,-.040]
+  harmful (80 neg/22 pos); v0.2->v0.3 +0.133 [+.088,+.182] beneficial (4/84);
+  v0.1->v0.3 +0.037 neutral; Qwen2.5->Qwen3 -0.125 [-.165,-.087] harmful
+  (86/11). NOTE: the Qwen direction flips vs synthetic (neutral there).
+- Consistency: v0.3 most stable (mean range 0.023), then qwen25 0.027,
+  v0.1 0.067, v0.2 0.153, qwen3 worst 0.287.
+- Synthetic vs BFCL: synthetic stress 0.83-0.99 vs BFCL 0.46-0.59 — the
+  synthetic suite OVERESTIMATES robustness, catastrophically for drift
+  (0.90-0.99 -> 0.19-0.24). Model rankings disagree (1/5 position agreement;
+  synthetic top-2 {v0.1,qwen25} vs BFCL top-2 {v0.3,qwen25}). Replicating
+  findings: v0.2 regression + v0.3 recovery on Mistral; v0.3/qwen25 most
+  consistent; qwen3 least consistent. Non-replicating: Qwen upgrade direction
+  (neutral synthetic vs harmful BFCL) and absolute levels.
+- Gate validation on BFCL: H1 supported (non-monotonic, CIs exclude zero).
+  H2 weakly supported (v0.1->v0.3 neutral hides a +0.20 timeout gain; no
+  opposing-swap case like synthetic Qwen). H3 supported at k<=20 (decision
+  accuracy 1.00; 0.75 at 30/40). H4 supported at small k (selected 1.00 vs
+  random 0.79 at k=10; parity at large k where random catches up). H5:
+  magnitude improves 3x with calibration (MAE 0.10 -> 0.03-0.04); decision
+  accuracy neutral (raw already near-ceiling).
+- Cross-suite transfer: ASYMMETRIC. Category informativeness from synthetic
+  decisions transfers to BFCL perfectly (accuracy 1.00 at k=10-30); BFCL
+  category informativeness transfers to synthetic poorly (0.25-0.50).
+  Interpretation: synthetic fault-recovery signal is suite-general; BFCL's
+  drift-floor signal is BFCL-specific.
+
+## 2026-10-01 — INVALIDATION: BFCL schema_drift results pre-drift-prompt-fix
+
+- Bug found (audit of all 900 schema_drift records across the three inspected
+  BFCL runs): BFCL prompts rendered the STATIC original native schema
+  (`task.tool_schema`) while evaluator/executor applied the drifted schema —
+  models were scored against a drift they never saw. Affected: 100% of BFCL
+  schema_drift records (rename 243/243, drop 189/189, type_mutation 144/144,
+  unexpected_field 324/324 across v0.1/v0.2/qwen3 runs).
+- INVALIDATED for schema_drift: all BFCL runs to date —
+  `upgradecanary-bfcl-smoke-itlwas-v0.2_seed1234_20260930T183543Z`,
+  `upgradecanary-bfcl-trials-itlwas-v0.1_seed1234_20261001T042558Z`,
+  `upgradecanary-bfcl-trials-itlwas-v0.2_seed1234_20261001T045510Z`,
+  `upgradecanary-bfcl-trials-itlwas-v0.3_seed1234_20261001T051347Z`,
+  `upgradecanary-bfcl-trials-qwen25_seed1234_20261001T053040Z`,
+  `upgradecanary-bfcl-trials-qwen3_seed1234_20261001T054551Z`.
+  Their baseline and runtime_fault records are unaffected and remain valid.
+- Conclusions withdrawn pending rerun: the BFCL "drift floor" (0.19-0.24),
+  field_drop-only drift signal, the "synthetic overestimates drift" cross-suite
+  claim, and the smoke-run claim that v0.2 cannot adapt to BFCL renames.
+  The synthetic-suite drift results are unaffected (synthetic prompts always
+  rendered the drifted internal schema).
+- Fix applied 2026-10-01: `bfcl.to_native_doc` rebuilds the BFCL-native
+  document from the passed (drifted) schema; `build_prompt` renders it for
+  BFCL tasks. Regression tests assert the drifted schema reaches the prompt
+  for every drift type and that prompt schema == evaluator schema. Parser,
+  evaluator, perturbations, and scoring unchanged. BFCL drift reruns required
+  before any public-suite drift claims.

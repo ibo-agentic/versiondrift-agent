@@ -26,6 +26,7 @@ from typing import Any
 import yaml
 
 from . import __version__
+from .bfcl import to_native_doc
 from .evaluator import evaluate, summarize
 from .model import create_client
 from .parsing import extract_tool_call
@@ -39,12 +40,12 @@ from .utils import run_id, sha256_text, utc_now_iso, write_json, write_jsonl, rn
 
 
 def build_prompt(task: Task, schema: dict[str, Any]) -> str:
-    # BFCL-derived tasks render the native upstream function document so the
-    # model sees the same schema shape as in the source benchmark; synthetic
-    # tasks render our internal schema.
+    # BFCL-derived tasks render the BFCL-native form of the PASSED schema, so
+    # schema drift is visible to the model exactly as the evaluator/executor
+    # apply it; synthetic tasks render our internal schema.
     native = getattr(task, "tool_schema", None)
     if getattr(task, "suite", "synthetic") == "bfcl" and native is not None:
-        tool_json = json.dumps({"tools": [native]}, indent=2, sort_keys=True)
+        tool_json = json.dumps({"tools": [to_native_doc(schema, native)]}, indent=2, sort_keys=True)
     else:
         tool_json = json.dumps({"tools": [schema]}, indent=2, sort_keys=True)
     return (

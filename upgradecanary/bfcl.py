@@ -54,6 +54,20 @@ def question_text(record: dict[str, Any]) -> str:
     )
 
 
+def internal_from_native(fn_doc: dict[str, Any]) -> dict[str, Any]:
+    """Canonical internal schema for a BFCL-native function document."""
+    props = fn_doc.get("parameters", {}).get("properties", {})
+    required = set(fn_doc.get("parameters", {}).get("required", []))
+    return {
+        "name": fn_doc.get("name", ""),
+        "description": fn_doc.get("description", ""),
+        "args": {
+            p: {"type": _TYPE_MAP.get(s.get("type"), "string"), "required": p in required}
+            for p, s in props.items()
+        },
+    }
+
+
 def rendered_prompt_chars(fn_doc: dict[str, Any], prompt: str) -> int:
     """Length of the prompt the runner would send (eligibility rule 10)."""
     from types import SimpleNamespace
@@ -61,7 +75,7 @@ def rendered_prompt_chars(fn_doc: dict[str, Any], prompt: str) -> int:
     from upgradecanary.runner import build_prompt
 
     task = SimpleNamespace(suite="bfcl", tool_schema=fn_doc, prompt=prompt)
-    return len(build_prompt(task, None))
+    return len(build_prompt(task, internal_from_native(fn_doc)))
 
 
 def is_eligible(record: dict[str, Any], answer: dict[str, Any] | None) -> tuple[bool, str]:
@@ -105,6 +119,54 @@ def is_eligible(record: dict[str, Any], answer: dict[str, Any] | None) -> tuple[
     if rendered_prompt_chars(fn, text) >= 1200:
         return False, "prompt_too_long"
     return True, "ok"
+
+
+_INTERNAL_TO_NATIVE = {
+    "integer": "integer",
+    "number": "number",
+    "string": "string",
+    "boolean": "boolean",
+}
+
+
+def to_native_doc(internal_schema: dict[str, Any], base_native: dict[str, Any]) -> dict[str, Any]:
+    """Rebuild a BFCL-native function document from a (possibly drifted)
+    internal schema, preserving the native document shape.
+
+    ``name``/``description`` come from ``base_native``; ``parameters.properties``
+    are rebuilt from the internal schema's current args — entries that exist in
+    the base document keep their original fields (description, default, items,
+    enum) with the internal type applied when it maps cleanly; unmapped types
+    are preserved verbatim; drift-added arguments (renames, new required
+    fields) get a minimal entry. ``required`` is rebuilt from the internal
+    required flags. For the canonical (baseline) schema this round-trips to
+    the original native document.
+    """
+    base_props = base_native.get("parameters", {}).get("properties", {})
+    properties: dict[str, Any] = {}
+    for pname, spec in internal_schema.get("args", {}).items():
+        base_entry = base_props.get(pname)
+        type_name = spec.get("type")
+        if base_entry is not None:
+            entry = dict(base_entry)
+            # Apply the internal type only when the base type is a mappable
+            # scalar; exotic base types (array/dict/...) stay verbatim so the
+            # baseline rendering round-trips to the original native document.
+            if base_entry.get("type") in _TYPE_MAP and type_name in _INTERNAL_TO_NATIVE:
+                # Apply the internal type only when it actually differs from the
+                # base type's normalization (i.e. a drift mutated it); unchanged
+                # arguments keep their original type name ("float" stays "float").
+                if _TYPE_MAP[base_entry["type"]] != type_name:
+                    entry["type"] = _INTERNAL_TO_NATIVE[type_name]
+        else:
+            entry = {"type": _INTERNAL_TO_NATIVE.get(type_name, "string")}
+        properties[pname] = entry
+    required = [p for p, s in internal_schema.get("args", {}).items() if s.get("required")]
+    return {
+        "name": base_native.get("name", internal_schema.get("name")),
+        "description": base_native.get("description", ""),
+        "parameters": {"type": "dict", "properties": properties, "required": required},
+    }
 
 
 def type_signature(fn: dict[str, Any], truth_args: dict[str, Any]) -> str:

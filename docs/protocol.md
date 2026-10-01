@@ -272,3 +272,16 @@ the original suite, which includes enum drift.
 - `args_valid_under_drift` and executor validation remain strict; strict JSON
   parsing is unchanged; the functional score formula is unchanged. This
   amendment changes intent semantics for BFCL tasks only.
+
+## BFCL drift-prompt transmission fix (dated 2026-10-01)
+
+- Bug: BFCL prompts rendered the static original native schema while the
+  evaluator/executor applied the drifted schema; models were scored against a
+  drift never shown to them. All BFCL schema_drift results produced before
+  this fix are invalidated (see docs/experiment_log.md); baseline and
+  runtime_fault results remain valid.
+- Fix: BFCL prompts now render `to_native_doc(schema, task.tool_schema)` — the
+  BFCL-native form of the drifted schema actually used by the evaluator — with
+  regression tests pinning prompt/evaluator schema equality for every drift
+  type. Confirmatory BFCL drift reruns must use the fixed harness; no drift
+  claim from the pre-fix runs may be cited.
