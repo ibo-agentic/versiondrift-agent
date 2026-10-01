@@ -259,3 +259,23 @@ are exploratory until the noted harness fixes land.
 - Zero smoke-run scores would change under the amendment (all observed
   omissions were genuinely required); the fix matters for the 22+15 affected
   tasks in full-suite runs.
+
+## 2026-09-30 — BFCL smoke summary; full BFCL-100 trial phase staged
+
+- BFCL smoke completed so far: itlwas Mistral v0.2
+  (`upgradecanary-bfcl-smoke-itlwas-v0.2_seed1234_20260930T183543Z`, 10 tasks
+  x 3 conditions x 1 trial): baseline 6/10, schema_drift 1/10,
+  runtime_fault 3/4 non-stale. Failure classes: BFCL-style `properties`
+  argument wrapper (2 baseline), genuinely required omitted arguments (2
+  baseline), stale-agent non-adaptation under rename/type/unexpected-field
+  drift (all drift failures). Notable: v0.2 adapts to renames on the
+  synthetic suite (1.00) but 0/3 on BFCL-native rendering — a real
+  model/format interaction to track in full runs.
+- BFCL smoke configured but NOT yet run: Qwen3
+  (`configs/bfcl_smoke_qwen3.yaml`) — run before the Qwen full trials.
+- Full BFCL-100 trial phase staged: five configs
+  (`configs/bfcl_trials_itlwas_v0.{1,2,3}.yaml`, `configs/bfcl_trials_qwen25.yaml`,
+  `configs/bfcl_trials_qwen3.yaml`), 100 tasks x 3 conditions x 3 trials
+  (1 greedy + 2 sampled, seeds 1234/1235/1236), all other settings matched
+  to the frozen protocol. Analysis: reuse `scripts/analyze_version_trials.py`
+  (pairs within/between families) and the gate validators after the runs.
