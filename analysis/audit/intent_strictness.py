@@ -272,49 +272,75 @@ def main() -> None:
     for r in new_flip_rows:
         print(" ", r)
 
-    # --- Append all 8 decision rows to verdict_flips.md (consistent with
-    # the fault-rescore candidate section, which also lists all 8 rows
-    # even though it found 0 flips) ---
+    update_verdict_flips(all_decision_rows, new_flip_rows)
+
+
+# Idempotency: this script's contribution to verdict_flips.md lives inside
+# these markers as one self-contained block (its own rows, renumbered fresh
+# every run, plus its own local flip tally and addendum text). Rerunning
+# this script removes the old block (if any) and reinserts a fresh one in
+# its place -- it never mutates anything outside the markers, in particular
+# never touches verdict_flips.py's own "N of M rows" summary line, so there
+# is no compounding/double-counting across reruns.
+#
+# Known limitation (out of scope for this fix): verdict_flips.py itself
+# does a full-file rewrite with no knowledge of this marker block, so
+# rerunning verdict_flips.py after this script will erase the block; rerun
+# this script again afterward to restore it.
+_SECTION_BEGIN = "<!-- BEGIN intent_strictness.py:auto-generated, do not hand-edit -->"
+_SECTION_END = "<!-- END intent_strictness.py:auto-generated -->"
+
+
+def update_verdict_flips(all_decision_rows: list[dict], new_flip_rows: list[dict]) -> None:
     vf_path = Path(__file__).parent / "verdict_flips.md"
     vf_text = vf_path.read_text(encoding="utf-8")
-    table_lines = vf_text.splitlines()
-    last_row_idx = max(i for i, l in enumerate(table_lines) if l.startswith("| ") and l[2].isdigit())
-    last_num = int(table_lines[last_row_idx].split("|")[1].strip())
-    insert_at = last_row_idx + 1
-    new_lines = []
+    all_lines = vf_text.splitlines()
+
+    # Strip any previous block from this script (if present) before
+    # computing where fresh numbering should start.
+    if _SECTION_BEGIN in vf_text:
+        begin_idx = next(i for i, l in enumerate(all_lines) if l.strip() == _SECTION_BEGIN)
+        end_idx = next(i for i, l in enumerate(all_lines) if l.strip() == _SECTION_END)
+        # Drop the block and one blank line immediately before it, if present.
+        start = begin_idx - 1 if begin_idx > 0 and not all_lines[begin_idx - 1].strip() else begin_idx
+        del all_lines[start:end_idx + 1]
+
+    last_row_idx = max(i for i, l in enumerate(all_lines) if l.startswith("| ") and len(l) > 2 and l[2].isdigit())
+    last_num = int(all_lines[last_row_idx].split("|")[1].strip())
+
+    block = [_SECTION_BEGIN, ""]
+    block.append("## Addendum: relaxed-intent (human spot-check) candidate fix")
+    block.append("")
+    block.append(
+        "Candidate only (see `intent_strictness.md`) -- strict scoring "
+        "remains official. Rows below use the five leniencies found by the "
+        "human spot-check (properties-wrapper, string-booleans, "
+        "unit-attached-to-number, unit-synonyms, swapped-symmetric-args) "
+        "applied together.\n"
+    )
+    block.append("| # | harness choice | pair | suite | verdict before | verdict after | flip? | stress diff before -> after |")
+    block.append("|---|---|---|---|---|---|---|---|")
     for i, r in enumerate(all_decision_rows, start=last_num + 1):
         marker = "**FLIP**" if r["flipped"] else "no change"
-        new_lines.append(
+        block.append(
             f"| {i} | {r['harness_choice']} | {r['pair']} | {r['suite']} | {r['before']} | {r['after']} | "
             f"{marker} | {r['diff_before']:+.3f} -> {r['diff_after']:+.3f} |"
         )
-    table_lines[insert_at:insert_at] = new_lines
-    for i, l in enumerate(table_lines):
-        if l.strip().startswith("**") and "rows are label flips" in l:
-            import re as _re
-            m = _re.search(r"\*\*(\d+) of (\d+) rows", l)
-            if m:
-                old_flips, old_total = int(m.group(1)), int(m.group(2))
-                table_lines[i] = f"**{old_flips + len(new_flip_rows)} of {old_total + len(all_decision_rows)} rows are label flips.**"
-            break
-    table_lines.append("")
-    table_lines.append("## Addendum: relaxed-intent (human spot-check) candidate fix")
-    table_lines.append("")
-    table_lines.append(
-        f"Rows above (added {len(all_decision_rows)}, {len(new_flip_rows)} flips) come from "
-        "`intent_strictness.md`'s relaxed-intent diagnostic (all 5 "
-        "human-spot-check causes applied together: properties-wrapper, "
-        "string-booleans, unit-attached-to-number, unit-synonyms, "
-        "swapped-symmetric-args). Candidate only -- strict scoring "
-        "remains official. Unlike escape-repair and the Qwen3 thinking-mode "
-        "fix, this candidate changes no decision's gate label -- the "
-        "biggest single-model effect (Mistral v0.2 on BFCL, where "
-        "`properties`-wrapper alone explains 96 intent failures) moves "
-        "both halves of each pair it's in roughly together, so the paired "
-        "difference barely shifts."
+    block.append("")
+    block.append(
+        f"**{len(new_flip_rows)} of {len(all_decision_rows)} rows in this section are label flips.** "
+        "Unlike escape-repair and the Qwen3 thinking-mode fix, this candidate "
+        "changes no decision's gate label -- the biggest single-model effect "
+        "(Mistral v0.2 on BFCL, where `properties`-wrapper alone explains 96 "
+        "intent failures) moves both halves of each pair it's in roughly "
+        "together, so the paired difference barely shifts."
     )
-    vf_path.write_text("\n".join(table_lines) + "\n", encoding="utf-8")
-    print(f"appended {len(all_decision_rows)} row(s) to {vf_path}")
+    block.append(_SECTION_END)
+
+    all_lines.append("")
+    all_lines.extend(block)
+    vf_path.write_text("\n".join(all_lines) + "\n", encoding="utf-8")
+    print(f"replaced this script's section in {vf_path} ({len(all_decision_rows)} rows, {len(new_flip_rows)} flips)")
 
 
 if __name__ == "__main__":
