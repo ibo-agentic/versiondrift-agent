@@ -16,6 +16,40 @@ from typing import Any
 _dll_dir_handles: list[object] = []
 
 
+def resolve_native_prompt_text(rendered_prompt: str, bos_token: str, model_wants_bos: bool) -> tuple[str, bool]:
+    """Decide whether to let llama.cpp auto-add a BOS token when tokenizing
+    a natively-rendered chat prompt, so at most one BOS reaches the model
+    (PLAN.md 10.1 check 1: "double BOS").
+
+    Many chat templates render the literal ``bos_token`` text themselves
+    (e.g. Mistral's official template starts with ``{{ bos_token }}``), and
+    the tokenizer is called with ``special=True`` (recognizes special-token
+    *text* like ``"<s>"`` wherever it appears and maps it to its token id --
+    the same mechanism HuggingFace's own tokenizers use after
+    ``apply_chat_template``). So when the template already embedded the
+    literal BOS text, that text alone will tokenize to exactly one BOS id
+    under ``special=True`` -- the text must be left UNCHANGED, and the
+    caller must pass ``add_bos=False`` so llama-cpp-python's own tokenizer
+    does not ALSO prepend one (two BOS ids total otherwise). When the
+    template does not embed it (e.g. ChatML/Qwen-style templates, which
+    rely on the caller), ``add_bos=True`` restores the single auto-added
+    BOS, matching the project's pre-existing legacy behavior. A model with
+    no BOS concept at all (``model_wants_bos=False``) never gets one
+    either way.
+
+    Returns ``(text_to_tokenize, add_bos)`` -- ``text_to_tokenize`` is
+    always the input unchanged; kept as part of the return value so the
+    call site has one place to read both the text and the flag together.
+    Pure string/bool logic, no tokenizer call -- independently unit-testable
+    (see tests/test_native_chat.py).
+    """
+    if not model_wants_bos:
+        return rendered_prompt, False
+    if bos_token and rendered_prompt.startswith(bos_token):
+        return rendered_prompt, False
+    return rendered_prompt, True
+
+
 def _add_bundled_cuda_dll_dirs() -> None:
     """Register NVIDIA CUDA runtime DLL folders bundled in the current venv.
 
@@ -81,6 +115,9 @@ class LlamaCppClient:
         if self._chat_wrapping not in ("legacy", "native"):
             raise ValueError(f"model.chat_wrapping must be 'legacy' or 'native', got {self._chat_wrapping!r}")
         self._native_formatter = None
+        self._native_bos_token = ""
+        self._native_wants_bos = True
+        self._native_stop: list[str] = []
         if self._chat_wrapping == "native":
             self._native_formatter = self._build_native_formatter()
             if self._native_formatter is None:
@@ -91,6 +128,13 @@ class LlamaCppClient:
                     "(with an explicit prompt_template) for this model, or "
                     "re-convert/choose a GGUF that preserves the template."
                 )
+            # Check 1 (double BOS) + check 2 (stop tokens from the model's
+            # own template, not a hard-coded list): both need the model's
+            # own bos/eos token text and its add_bos_token() capability flag.
+            self._native_bos_token = self._native_formatter.bos_token
+            self._native_wants_bos = bool(self._llm._model.add_bos_token())
+            if self._native_formatter.eos_token:
+                self._native_stop = [self._native_formatter.eos_token]
 
         # PLAN.md F2: thinking on/off (Qwen3 only; harmless no-op for any
         # template that doesn't reference "enable_thinking"). Only takes
@@ -129,6 +173,13 @@ class LlamaCppClient:
             "chat_wrapping": self._chat_wrapping,
             "native_chat_template_found": self._native_formatter is not None,
             "thinking": self._thinking,
+            # Checks 1-2 from the 2026-10-03 native-wrapping review: what was
+            # actually resolved for BOS handling and stop tokens, logged so a
+            # run_manifest.json reader never has to re-derive this from the
+            # GGUF themselves.
+            "native_bos_token": self._native_bos_token,
+            "native_model_wants_bos": self._native_wants_bos,
+            "native_stop_tokens": self._native_stop,
         }
 
     def _build_native_formatter(self):
@@ -154,6 +205,10 @@ class LlamaCppClient:
             template=template,
             eos_token=eos_token,
             bos_token=bos_token,
+            # Check 3: explicit (not relying on the library default staying
+            # True) -- the assistant turn must be opened so generation
+            # continues the turn rather than starting a new user turn.
+            add_generation_prompt=True,
             stop_token_ids=[eos_id] if eos_id != -1 else None,
         )
 
@@ -181,9 +236,23 @@ class LlamaCppClient:
                 tools=tools,
                 **render_kwargs,
             )
-            prompt = rendered.prompt
-            if stop is None and rendered.stop:
-                stop = [rendered.stop] if isinstance(rendered.stop, str) else list(rendered.stop)
+            # Check 1: pre-tokenize ourselves with the resolved add_bos
+            # decision and pass token IDs (not a string) to create_completion
+            # -- a List[int] prompt makes create_completion skip its own
+            # auto-BOS entirely (llama.py _create_completion: "isinstance
+            # (prompt, list) and suffix is None" -> bos_tokens = []), so
+            # whatever add_bos we pass to tokenize() here is the only BOS
+            # decision in effect; at most one BOS reaches the model either way.
+            text_to_tokenize, add_bos = resolve_native_prompt_text(
+                rendered.prompt, self._native_bos_token, self._native_wants_bos
+            )
+            prompt = self._llm.tokenize(text_to_tokenize.encode("utf-8"), add_bos=add_bos, special=True)
+            # Check 2: stop tokens come from the model's own template
+            # (self._native_stop, resolved at init from the GGUF's own
+            # eos token), merged with any explicit config override rather
+            # than a hard-coded per-family list.
+            merged = list(dict.fromkeys((stop or []) + self._native_stop))
+            stop = merged or None
         elif self._prompt_template is not None:
             prompt = self._prompt_template.format(prompt=prompt)
         # Per-call temperature/seed support repeated trials. llama-cpp-python
