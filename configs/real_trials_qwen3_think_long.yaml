@@ -1,0 +1,49 @@
+# Real-model repeated-trials config (Qwen3-8B, THINKING ON, long budget) — 100 tasks x 3 trials.
+# Audit follow-up (2026-10-02) counterpart to real_trials_qwen3_nothink.yaml:
+# keeps thinking mode on (the model's real default) but raises max_tokens to
+# 2048 so a full think block + JSON answer almost never gets truncated.
+# Comparing this run to the original real_trials_qwen3.yaml (thinking on,
+# max_tokens=256) isolates the effect of the token budget alone; comparing
+# it to real_trials_qwen3_nothink.yaml isolates thinking mode itself.
+# Writes to a NEW result folder; does not touch any existing run.
+
+experiment: upgradecanary-real-trials-qwen3-think-long
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+# no task_limit: all 100 tasks
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 3
+trial_temperatures: [0.0, 0.7, 0.7]
+trial_seeds: [1234, 1235, 1236]
+
+model:
+  provider: llama_cpp
+  path: models/qwen/Qwen3-8B-Q4_K_M.gguf
+  n_ctx: 4096             # raised from 2048: a 2048-token budget would clip a long think block
+  n_gpu_layers: -1
+  temperature: 0.0          # fallback for trials without explicit temperatures
+  max_tokens: 2048
+  seed: 1234
+  # ChatML template (Qwen native); thinking mode runs normally (no prefill).
+  prompt_template: "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant"
+  stop: ["<|im_end|>"]
+
+parsing:
+  # Strip the (now almost-always complete) think block before scanning for
+  # JSON, so a stray brace inside the model's reasoning can't be picked up
+  # by mistake. Off by default elsewhere (see upgradecanary/parsing.py).
+  strip_think_block: true
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true
