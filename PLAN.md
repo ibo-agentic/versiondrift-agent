@@ -141,7 +141,7 @@ Each hypothesis is reported as supported / not supported, with numbers, whicheve
 ## 10. Order of work
 
 1. **Engineering** (no model runs): config switches for F1–F6; BFCL-multiple loader; `fault_reporting` condition; A/A and positive-control configs; all analysis scripts idempotent; tests pass.
-2. **Smoke tests:** every model, 5 tasks, check template render, JSON parse, truncation flag. Confirm each GGUF actually contains `tokenizer.chat_template` (needed for D's wrapping and for F3). Verify Llama-3.1, Phi-4-mini, and Granite native tool templates render with a tool list. Check Gemma-2-9b memory fit.
+2. **Smoke tests:** every model, 5 tasks, check template render, JSON parse, truncation flag. Confirm each GGUF actually contains `tokenizer.chat_template` (needed for D's wrapping and for F3). Verify Llama-3.1, Phi-4-mini, and Granite native tool templates render with a tool list. Check Gemma-2-9b memory fit. **Over-generation check:** flag any output that contains a role marker or end-of-turn text (e.g. `<|start_header_id|>`, `<|im_start|>`, `<|eot_id|>`, `<end_of_turn>`, `<|end|>`, `<|assistant|>`) — this would mean generation ran past the intended turn despite the stop list.
 3. **Commit this PLAN.md** (binding from here).
 4. **Runs:** D on all models first, then factors, then controls, then R.
 5. **Analysis** exactly as Sections 8–9. Extra analyses allowed but labeled "exploratory".
