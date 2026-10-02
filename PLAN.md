@@ -90,6 +90,7 @@ Stress diff = mean paired success difference (new − old) over the stress condi
 | F8 | Intent rule | strict / relaxed (5 causes) | No — rescore |
 | F9 | Gate rule | point threshold / CI gate (Section 8) | No — rescore |
 | F10 | Trials | 1 (greedy only) / 3 | No — subsample |
+| F11 | Chat wrapping | legacy (old hand-built template string) / native (GGUF's own chat template) | Yes — Mistral and Qwen models only |
 
 **F4 note:** a full-schema grammar built from the drifted schema forces the drifted field names and types, so the model no longer has to adapt to drift by itself. That level changes what `schema_drift` measures. It is kept because real deployments use strict structured output, but it is analyzed separately and is not part of the nuisance set or of R.
 
