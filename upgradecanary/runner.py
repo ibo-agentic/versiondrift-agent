@@ -130,6 +130,10 @@ def run(config_path: str) -> dict[str, Any]:
     fault_enabled = fault_cfg.get("enabled", [])
     retry_once = bool(fault_cfg.get("retry_once", True))
     strict_baseline = bool(cfg.get("executor", {}).get("strict_baseline_args", True))
+    # Off by default; see upgradecanary/parsing.py. Existing configs have no
+    # "parsing" key, so extract_tool_call behavior is unchanged unless a
+    # config explicitly opts in (2026-10-02 audit follow-up, item 2).
+    strip_think = bool(cfg.get("parsing", {}).get("strip_think_block", False))
 
     raw_rows: list[dict[str, Any]] = []
     parsed_rows: list[dict[str, Any]] = []
@@ -164,7 +168,10 @@ def run(config_path: str) -> dict[str, Any]:
                 raw = client.generate(
                     prompt, context, temperature=temperature, seed=trial_seed
                 )
-                parsed = extract_tool_call(raw)
+                truncated = (
+                    client.last_truncated() if hasattr(client, "last_truncated") else None
+                )
+                parsed = extract_tool_call(raw, strip_think=strip_think)
                 exec_result = _safe_execute(
                     parsed, schema, drift, fault, strict, canonical_schema=base_schema
                 )
@@ -172,6 +179,7 @@ def run(config_path: str) -> dict[str, Any]:
                 recovered: bool | None = None
                 retry_prompt = None
                 retry_raw = None
+                retry_truncated = None
                 if (
                     condition == "runtime_fault"
                     and is_retryable(fault)
@@ -191,7 +199,10 @@ def run(config_path: str) -> dict[str, Any]:
                         temperature=temperature,
                         seed=trial_seed,
                     )
-                    retry_parsed = extract_tool_call(retry_raw)
+                    retry_truncated = (
+                        client.last_truncated() if hasattr(client, "last_truncated") else None
+                    )
+                    retry_parsed = extract_tool_call(retry_raw, strip_think=strip_think)
                     retry_exec = _safe_execute(
                         retry_parsed, schema, drift, None, strict,
                         canonical_schema=base_schema,
@@ -227,8 +238,13 @@ def run(config_path: str) -> dict[str, Any]:
                         "prompt_sha256": sha256_text(prompt),
                         "prompt": prompt,
                         "raw_output": raw,
+                        # None = unknown/not applicable (e.g. mock client);
+                        # True/False only for backends that report a finish
+                        # reason (2026-10-02 audit follow-up, item 2).
+                        "truncated": truncated,
                         "retry_prompt_sha256": sha256_text(retry_prompt) if retry_prompt else None,
                         "retry_raw_output": retry_raw,
+                        "retry_truncated": retry_truncated,
                     }
                 )
                 # No run_id/timestamps here: parsed_results.jsonl must stay
@@ -282,6 +298,10 @@ def run(config_path: str) -> dict[str, Any]:
             "num_tasks": len(tasks),
             "num_trials": len(trials),
             "num_records": len(parsed_rows),
+            # Backend/version/sampling-params snapshot for reproducibility
+            # (2026-10-02 audit follow-up, item 4). {} for the mock client,
+            # which has no backend_info().
+            "model_backend": client.backend_info() if hasattr(client, "backend_info") else {},
         },
     )
     return summary

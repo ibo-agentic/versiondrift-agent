@@ -67,6 +67,11 @@ class MockModelClient:
             ensure_ascii=False, sort_keys=True, indent=2,
         )
 
+    def last_truncated(self) -> bool | None:
+        # The mock provider never truncates; None = not applicable (see
+        # model/base.py ModelClient.last_truncated).
+        return None
+
     def _choose_call(self, task: Any, condition: str, drift: Any, is_retry: bool) -> dict[str, Any]:
         expected = task.expected_call
         arguments = dict(expected["arguments"])

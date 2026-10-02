@@ -24,3 +24,13 @@ class ModelClient(Protocol):
         seed: int | None = None,
     ) -> str:
         ...
+
+    def last_truncated(self) -> bool | None:
+        """Whether the most recent ``generate`` call hit max_tokens.
+
+        None = unknown / not applicable (e.g. the mock client, or a backend
+        that does not report a finish reason). Added for the 2026-10-02
+        audit follow-up; callers must treat None as "no information",
+        never as False.
+        """
+        ...
