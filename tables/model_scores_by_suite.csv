@@ -1,0 +1,11 @@
+suite,model,baseline,schema_drift,runtime_fault,stress
+synthetic,Mistral v0.1,1.000,0.990,1.000,0.995
+synthetic,Mistral v0.2,1.000,0.897,0.757,0.827
+synthetic,Mistral v0.3,0.970,0.930,0.970,0.950
+synthetic,Qwen2.5,1.000,0.937,1.000,0.968
+synthetic,Qwen3,0.997,0.907,0.947,0.927
+BFCL,Mistral v0.1,0.890,0.690,0.883,0.787
+BFCL,Mistral v0.2,0.807,0.623,0.720,0.672
+BFCL,Mistral v0.3,0.943,0.777,0.940,0.858
+BFCL,Qwen2.5,0.950,0.923,0.950,0.937
+BFCL,Qwen3,0.850,0.693,0.720,0.707

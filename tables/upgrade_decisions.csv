@@ -1,0 +1,9 @@
+suite,decision,d_baseline,d_schema_drift,d_runtime_fault,d_stress,gate_label,neg_flips,pos_flips,ci95_lo,ci95_hi
+synthetic,v0.1->v0.2,+0.000,-0.093,-0.243,-0.168,harmful,102,1,-0.218,-0.122
+synthetic,v0.2->v0.3,-0.030,+0.033,+0.213,+0.123,beneficial,19,93,+0.062,+0.180
+synthetic,v0.1->v0.3,-0.030,-0.060,-0.030,-0.045,neutral,28,1,-0.083,-0.013
+synthetic,Qwen2.5->Qwen3,-0.003,-0.030,-0.053,-0.042,neutral,44,19,-0.078,-0.007
+BFCL,v0.1->v0.2,-0.083,-0.067,-0.163,-0.115,harmful,114,45,-0.183,-0.050
+BFCL,v0.2->v0.3,+0.137,+0.153,+0.220,+0.187,beneficial,13,125,+0.133,+0.245
+BFCL,v0.1->v0.3,+0.053,+0.087,+0.057,+0.072,beneficial,16,59,+0.035,+0.110
+BFCL,Qwen2.5->Qwen3,-0.100,-0.230,-0.230,-0.230,harmful,152,14,-0.283,-0.177

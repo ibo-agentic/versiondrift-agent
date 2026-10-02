@@ -1,0 +1,11 @@
+suite,model,all_trial_success_300,all_trial_fail_300,mean_score_range
+synthetic,Mistral v0.1,297,0,0.010
+synthetic,Mistral v0.2,257,25,0.060
+synthetic,Mistral v0.3,286,12,0.007
+synthetic,Qwen2.5,290,2,0.027
+synthetic,Qwen3,273,6,0.070
+BFCL,Mistral v0.1,222,36,0.140
+BFCL,Mistral v0.2,183,59,0.193
+BFCL,Mistral v0.3,259,24,0.057
+BFCL,Qwen2.5,276,14,0.033
+BFCL,Qwen3,167,21,0.373
