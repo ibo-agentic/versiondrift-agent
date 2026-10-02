@@ -28,8 +28,16 @@ One row per (harness choice x upgrade pair x suite). "before"/"after" are the ga
 | 22 | Fault rescore (final-attempt-consistent) fix -- CANDIDATE, not applied | Mistral v0.2->Mistral v0.3 | BFCL | beneficial | beneficial | no change | +0.187 -> +0.157 |
 | 23 | Fault rescore (final-attempt-consistent) fix -- CANDIDATE, not applied | Mistral v0.1->Mistral v0.3 | BFCL | beneficial | beneficial | no change | +0.072 -> +0.053 |
 | 24 | Fault rescore (final-attempt-consistent) fix -- CANDIDATE, not applied | Qwen2.5->Qwen3 | BFCL | harmful | harmful | no change | -0.230 -> -0.205 |
+| 25 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.1->Mistral v0.2 | synthetic | harmful | harmful | no change | -0.168 -> -0.168 |
+| 26 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.2->Mistral v0.3 | synthetic | beneficial | beneficial | no change | +0.123 -> +0.123 |
+| 27 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.1->Mistral v0.3 | synthetic | neutral | neutral | no change | -0.045 -> -0.045 |
+| 28 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Qwen2.5->Qwen3 | synthetic | neutral | neutral | no change | -0.042 -> -0.042 |
+| 29 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.1->Mistral v0.2 | BFCL | harmful | harmful | no change | -0.115 -> -0.110 |
+| 30 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.2->Mistral v0.3 | BFCL | beneficial | beneficial | no change | +0.187 -> +0.180 |
+| 31 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Mistral v0.1->Mistral v0.3 | BFCL | beneficial | beneficial | no change | +0.072 -> +0.070 |
+| 32 | Relaxed-intent (5 human-spot-check causes) fix -- CANDIDATE, not applied | Qwen2.5->Qwen3 | BFCL | harmful | harmful | no change | -0.230 -> -0.235 |
 
-**5 of 24 rows are label flips.**
+**5 of 32 rows are label flips.**
 
 
 ## Reading this table
@@ -39,3 +47,7 @@ One row per (harness choice x upgrade pair x suite). "before"/"after" are the ga
 - Rows 9-16 (escape-repair candidate): check whether these rows flip before treating any of them as settled -- the escape bug was concentrated in Mistral v0.1/v0.2 `runtime_fault` (see `escape_check.md`), so the Mistral v0.1->v0.2 rows are where a flip is most plausible a priori.
 - **Row 9 is exactly on the gate boundary, not comfortably past it**: the lenient stress diff is `-30/600 = -0.050000` to full precision -- an exact tie with the `-0.05` threshold, not a rounding artifact. The gate rule (`scripts/analyze_release_gate.py:gate_label`, `d < -GATE_THRESHOLD`) uses a strict inequality, so exactly `-0.05` is labeled "neutral" by one ULP's worth of margin. This is the headline, published H1 illustrative example ("v0.1->v0.2 significantly regressed") sitting on a coin-flip: a single additional record going either way would move it back to "harmful" or further into "neutral". Read this as "the escape bug alone is enough to erase this decision's safety margin entirely," not as "this decision is now robustly neutral."
 - Rows 17-24 (fault-rescore candidate): checks whether final-attempt-consistent scoring (vs. the current mixed first-attempt-metrics/retry-exec_ok scoring, see AUDIT.md E10) moves any decision across the gate boundary on its own.
+
+## Addendum: relaxed-intent (human spot-check) candidate fix
+
+Rows above (added 8, 0 flips) come from `intent_strictness.md`'s relaxed-intent diagnostic (all 5 human-spot-check causes applied together: properties-wrapper, string-booleans, unit-attached-to-number, unit-synonyms, swapped-symmetric-args). Candidate only -- strict scoring remains official. Unlike escape-repair and the Qwen3 thinking-mode fix, this candidate changes no decision's gate label -- the biggest single-model effect (Mistral v0.2 on BFCL, where `properties`-wrapper alone explains 96 intent failures) moves both halves of each pair it's in roughly together, so the paired difference barely shifts.
