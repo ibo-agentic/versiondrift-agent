@@ -8,7 +8,7 @@ reading the installed package's source directly (see ENGINEERING_NOTES.md).
 
 from __future__ import annotations
 
-from upgradecanary.model.llama_cpp_client import resolve_native_prompt_text
+from upgradecanary.model.llama_cpp_client import build_native_stop_list, resolve_native_prompt_text
 
 BOS = "<s>"
 BOS_ID = 1  # arbitrary stand-in id, matches common llama.cpp conventions
@@ -88,3 +88,33 @@ def test_single_bos_when_template_does_not_embed_bos():
     tokens = _FakeTokenizer().tokenize(text.encode("utf-8"), add_bos=add_bos, special=True)
     assert tokens.count(BOS_ID) == 1
     assert tokens[0] == BOS_ID
+
+
+def test_stop_list_includes_both_eos_and_distinct_eot():
+    # Llama 3 style: eos_token = "<|end_of_text|>", eot_token = "<|eot_id|>"
+    stops = build_native_stop_list("<|end_of_text|>", "<|eot_id|>")
+    assert stops == ["<|end_of_text|>", "<|eot_id|>"]
+
+
+def test_stop_list_gemma_style():
+    stops = build_native_stop_list("<eos>", "<end_of_turn>")
+    assert stops == ["<eos>", "<end_of_turn>"]
+
+
+def test_stop_list_phi3_style():
+    stops = build_native_stop_list("<|endoftext|>", "<|end|>")
+    assert stops == ["<|endoftext|>", "<|end|>"]
+
+
+def test_stop_list_dedups_when_eot_equals_eos():
+    stops = build_native_stop_list("</s>", "</s>")
+    assert stops == ["</s>"]
+
+
+def test_stop_list_eos_only_when_model_has_no_dedicated_eot():
+    stops = build_native_stop_list("<|im_end|>", "")
+    assert stops == ["<|im_end|>"]
+
+
+def test_stop_list_empty_when_neither_present():
+    assert build_native_stop_list("", "") == []

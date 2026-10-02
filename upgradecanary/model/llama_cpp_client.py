@@ -50,6 +50,32 @@ def resolve_native_prompt_text(rendered_prompt: str, bos_token: str, model_wants
     return rendered_prompt, True
 
 
+def build_native_stop_list(eos_token: str, eot_token: str) -> list[str]:
+    """Stop-string list for native chat wrapping.
+
+    The model's primary ``eos_token`` is not always the token the chat
+    template actually uses to end a TURN: Llama 3 distinguishes
+    ``<|eot_id|>`` (end of turn) from ``<|end_of_text|>`` (eos); Gemma
+    distinguishes ``<end_of_turn>`` from ``<eos>``; Phi-3 distinguishes
+    ``<|end|>`` from ``<|endoftext|>``. This includes both (when the model
+    has a distinct end-of-turn token at all -- ``eot_token`` is ``""``
+    otherwise), deduplicated, order preserved.
+
+    Note llama.cpp's own generation loop already halts on ANY native
+    end-of-generation token at the token-ID level regardless of this list
+    (``llama_vocab_is_eog()``, verified directly in the installed
+    llama-cpp-python's ``llama.py:1412``) -- this text-level stop list is a
+    redundant backstop for the ``stop=`` string-matching path, not the only
+    thing preventing over-generation. Pure function, independently
+    testable (see tests/test_native_chat.py).
+    """
+    stops: list[str] = []
+    for tok in (eos_token, eot_token):
+        if tok and tok not in stops:
+            stops.append(tok)
+    return stops
+
+
 def _add_bundled_cuda_dll_dirs() -> None:
     """Register NVIDIA CUDA runtime DLL folders bundled in the current venv.
 
@@ -117,6 +143,7 @@ class LlamaCppClient:
         self._native_formatter = None
         self._native_bos_token = ""
         self._native_wants_bos = True
+        self._native_eot_token = ""
         self._native_stop: list[str] = []
         if self._chat_wrapping == "native":
             self._native_formatter = self._build_native_formatter()
@@ -131,10 +158,12 @@ class LlamaCppClient:
             # Check 1 (double BOS) + check 2 (stop tokens from the model's
             # own template, not a hard-coded list): both need the model's
             # own bos/eos token text and its add_bos_token() capability flag.
+            # _build_native_formatter() already set self._native_eot_token.
             self._native_bos_token = self._native_formatter.bos_token
             self._native_wants_bos = bool(self._llm._model.add_bos_token())
-            if self._native_formatter.eos_token:
-                self._native_stop = [self._native_formatter.eos_token]
+            self._native_stop = build_native_stop_list(
+                self._native_formatter.eos_token, self._native_eot_token
+            )
 
         # PLAN.md F2: thinking on/off (Qwen3 only; harmless no-op for any
         # template that doesn't reference "enable_thinking"). Only takes
@@ -179,6 +208,11 @@ class LlamaCppClient:
             # GGUF themselves.
             "native_bos_token": self._native_bos_token,
             "native_model_wants_bos": self._native_wants_bos,
+            # native_eot_token is "" when the model has no dedicated
+            # end-of-turn token distinct from eos (llama_vocab_eot() == -1);
+            # native_stop_tokens is the deduplicated [eos_token, eot_token]
+            # list actually passed to create_completion's stop=.
+            "native_eot_token": self._native_eot_token,
             "native_stop_tokens": self._native_stop,
         }
 
@@ -201,6 +235,15 @@ class LlamaCppClient:
         bos_id = self._llm.token_bos()
         eos_token = self._llm._model.token_get_text(eos_id) if eos_id != -1 else ""
         bos_token = self._llm._model.token_get_text(bos_id) if bos_id != -1 else ""
+        # 2026-10-03 follow-up: the model's primary eos_token is not always
+        # the same token the chat template uses to end a TURN -- Llama 3
+        # (<|eot_id|> vs <|end_of_text|>), Gemma (<end_of_turn> vs <eos>),
+        # and Phi-3 (<|end|> vs <|endoftext|>) all distinguish the two.
+        # llama_vocab_eot() reads the GGUF's own dedicated EOT token (-1 if
+        # the model has none); stored here so __init__ can fold it into the
+        # stop list alongside eos_token.
+        eot_id = self._llm._model.token_eot()
+        self._native_eot_token = self._llm._model.token_get_text(eot_id) if eot_id != -1 else ""
         return Jinja2ChatFormatter(
             template=template,
             eos_token=eos_token,
@@ -209,7 +252,7 @@ class LlamaCppClient:
             # True) -- the assistant turn must be opened so generation
             # continues the turn rather than starting a new user turn.
             add_generation_prompt=True,
-            stop_token_ids=[eos_id] if eos_id != -1 else None,
+            stop_token_ids=[i for i in (eos_id, eot_id) if i != -1] or None,
         )
 
     def backend_info(self) -> dict[str, Any]:
