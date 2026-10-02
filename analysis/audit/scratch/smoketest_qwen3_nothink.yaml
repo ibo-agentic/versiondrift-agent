@@ -1,0 +1,42 @@
+# Smoke-test config only (per the 2026-10-02 run request, step 1). Not one
+# of the 4 "real" new configs under configs/ -- this is a throwaway, 5-task,
+# baseline-only, single-greedy-trial check that qwen3_nothink behaves before
+# committing to any full run. Writes its own new results/ folder; touches
+# nothing existing.
+
+experiment: upgradecanary-smoketest-qwen3-nothink
+seed: 1234
+
+data: data/base_tasks.jsonl
+output_dir: results
+task_limit: 5
+
+conditions: [baseline]
+
+trials: 1
+trial_temperatures: [0.0]
+trial_seeds: [1234]
+
+model:
+  provider: llama_cpp
+  path: models/qwen/Qwen3-8B-Q4_K_M.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0
+  max_tokens: 256
+  seed: 1234
+  prompt_template: "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  stop: ["<|im_end|>"]
+
+parsing:
+  strip_think_block: true
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true

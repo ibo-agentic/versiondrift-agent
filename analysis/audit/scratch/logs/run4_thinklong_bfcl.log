@@ -1,0 +1,60 @@
+{
+  "conditions": {
+    "baseline": {
+      "by_trial": {
+        "0": 0.97,
+        "1": 0.96,
+        "2": 0.96
+      },
+      "mean_args_exact": 0.6933,
+      "mean_args_intent_match": 0.9633,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": null,
+      "mean_score": 0.9633,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": 0.0
+    },
+    "runtime_fault": {
+      "by_trial": {
+        "0": 0.95,
+        "1": 0.95,
+        "2": 0.95
+      },
+      "mean_args_exact": 0.71,
+      "mean_args_intent_match": 0.95,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": 1.0,
+      "mean_score": 0.95,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": -0.0133
+    },
+    "schema_drift": {
+      "by_trial": {
+        "0": 0.91,
+        "1": 0.94,
+        "2": 0.91
+      },
+      "mean_args_exact": 0.0,
+      "mean_args_intent_match": 0.92,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": null,
+      "mean_score": 0.92,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": -0.0433
+    }
+  },
+  "model_provider": "llama_cpp",
+  "num_records": 900,
+  "num_trials": 3,
+  "run_id": "upgradecanary-bfcl-trials-qwen3-think-long_seed1234_20261001T232407Z"
+}
+RUN4_EXIT_CODE=0

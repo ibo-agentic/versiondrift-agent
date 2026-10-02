@@ -1,0 +1,60 @@
+{
+  "conditions": {
+    "baseline": {
+      "by_trial": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0
+      },
+      "mean_args_exact": 1.0,
+      "mean_args_intent_match": 1.0,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": null,
+      "mean_score": 1.0,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": 0.0
+    },
+    "runtime_fault": {
+      "by_trial": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0
+      },
+      "mean_args_exact": 1.0,
+      "mean_args_intent_match": 1.0,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": 1.0,
+      "mean_score": 1.0,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": 0.0
+    },
+    "schema_drift": {
+      "by_trial": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0
+      },
+      "mean_args_exact": 0.0,
+      "mean_args_intent_match": 1.0,
+      "mean_args_valid_under_drift": 1.0,
+      "mean_executor_ok": 1.0,
+      "mean_parse_ok": 1.0,
+      "mean_recovered_after_fault": null,
+      "mean_score": 1.0,
+      "mean_tool_name_ok": 1.0,
+      "n": 300,
+      "score_delta_vs_baseline": 0.0
+    }
+  },
+  "model_provider": "llama_cpp",
+  "num_records": 900,
+  "num_trials": 3,
+  "run_id": "upgradecanary-real-trials-qwen3-nothink_seed1234_20261001T213910Z"
+}
+RUN1_EXIT_CODE=0
