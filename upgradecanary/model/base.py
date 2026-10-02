@@ -12,7 +12,13 @@ class ModelClient(Protocol):
     retry feedback). Real backends ignore it; the mock client uses it to behave
     deterministically. ``temperature``/``seed`` override the client's defaults
     for a single call (repeated trials); llama-cpp-python honors per-call
-    seeding (best-effort on GPU).
+    seeding (best-effort on GPU). ``tools``/``response_schema`` are optional
+    (PLAN.md F3/F4): ``tools`` is an OpenAI-style tool-list, used only under
+    ``chat_wrapping: native`` + ``prompt_format: native``; ``response_schema``
+    is a JSON Schema dict used to build a constrained-decoding grammar
+    (PLAN.md F4 generic_json/full_schema). Clients that don't support either
+    must accept and ignore them, never error, so existing call sites that
+    omit them keep working unchanged.
     """
 
     def generate(
@@ -22,6 +28,8 @@ class ModelClient(Protocol):
         *,
         temperature: float | None = None,
         seed: int | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        response_schema: dict[str, Any] | None = None,
     ) -> str:
         ...
 
