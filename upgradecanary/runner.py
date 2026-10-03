@@ -27,6 +27,7 @@ import yaml
 
 from . import __version__
 from .bfcl import to_native_doc
+from .constrained import response_schema_for, schema_to_openai_tool
 from .evaluator import evaluate, summarize
 from .model import create_client
 from .parsing import extract_tool_call
@@ -39,7 +40,17 @@ from .tools import BASE_SCHEMAS, execute
 from .utils import run_id, sha256_text, utc_now_iso, write_json, write_jsonl, rng_for
 
 
-def build_prompt(task: Task, schema: dict[str, Any]) -> str:
+def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "shared") -> str:
+    # PLAN.md F3: "native" sends only the bare question -- the model's own
+    # chat template renders the tool definitions from the tools= list
+    # passed separately to ModelClient.generate() (see run(), below). This
+    # requires chat_wrapping: native (validated in run()); the hand-built
+    # JSON-in-prompt instruction below is specific to "shared" and has no
+    # equivalent under a model's native tool template.
+    if prompt_format == "native":
+        return task.prompt
+    if prompt_format != "shared":
+        raise ValueError(f"prompt_format must be 'shared' or 'native', got {prompt_format!r}")
     # BFCL-derived tasks render the BFCL-native form of the PASSED schema, so
     # schema drift is visible to the model exactly as the evaluator/executor
     # apply it; synthetic tasks render our internal schema.
@@ -57,6 +68,50 @@ def build_prompt(task: Task, schema: dict[str, Any]) -> str:
         f"Question: {task.prompt}\n"
         "Answer:"
     )
+
+
+def resolve_run_factors(cfg: dict[str, Any]) -> dict[str, Any]:
+    """PLAN.md section 5's F1-F6 as an explicit, logged summary -- read
+    straight from the raw config (no model instantiation needed), so every
+    run (including the mock provider) gets one unambiguous record of which
+    factor levels it used. Values mirror the config's own keys/defaults;
+    this function does not invent a level the config didn't ask for.
+    """
+    model_cfg = cfg.get("model", {})
+    return {
+        "F1_max_tokens": model_cfg.get("max_tokens"),
+        "F2_thinking": model_cfg.get("thinking", "default"),
+        "F3_prompt_format": cfg.get("prompt_format", "shared"),
+        "F4_constrained_decoding": cfg.get("constrained_decoding", "off"),
+        "F5_quant_level": model_cfg.get("quant_level", "unspecified"),
+        "F6_sampling_preset": model_cfg.get("sampling_preset", "shared"),
+        "F11_chat_wrapping": model_cfg.get("chat_wrapping", "legacy"),
+    }
+
+
+def validate_run_factors(cfg: dict[str, Any]) -> None:
+    """Config-time checks for factor levels/combinations that cannot work.
+    Raises ValueError with a clear message; called before any model call."""
+    model_cfg = cfg.get("model", {})
+    prompt_format = cfg.get("prompt_format", "shared")
+    constrained_decoding = cfg.get("constrained_decoding", "off")
+    sampling_preset = model_cfg.get("sampling_preset", "shared")
+    chat_wrapping = model_cfg.get("chat_wrapping", "legacy")
+
+    if prompt_format not in ("shared", "native"):
+        raise ValueError(f"prompt_format must be 'shared' or 'native', got {prompt_format!r}")
+    if constrained_decoding not in ("off", "generic_json", "full_schema"):
+        raise ValueError(
+            f"constrained_decoding must be 'off', 'generic_json', or 'full_schema', got {constrained_decoding!r}"
+        )
+    if sampling_preset not in ("shared", "recommended"):
+        raise ValueError(f"model.sampling_preset must be 'shared' or 'recommended', got {sampling_preset!r}")
+    if prompt_format == "native" and chat_wrapping != "native":
+        raise ValueError(
+            "prompt_format: native requires model.chat_wrapping: native -- "
+            "legacy wrapping has no mechanism to pass a tools= list into a "
+            "hand-built template string."
+        )
 
 
 def _safe_execute(parsed, schema, drift, fault, strict, canonical_schema=None) -> dict[str, Any]:
@@ -113,6 +168,8 @@ def run(config_path: str) -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
 
+    validate_run_factors(cfg)
+
     seed = int(cfg["seed"])
     rid = run_id(cfg.get("experiment", "run"), seed)
     out_dir = Path(cfg["output_dir"]) / rid
@@ -134,6 +191,11 @@ def run(config_path: str) -> dict[str, Any]:
     # "parsing" key, so extract_tool_call behavior is unchanged unless a
     # config explicitly opts in (2026-10-02 audit follow-up, item 2).
     strip_think = bool(cfg.get("parsing", {}).get("strip_think_block", False))
+    # PLAN.md F3/F4. Both default to the exact pre-existing behavior
+    # ("shared" prompt text, no constrained decoding) when the keys are
+    # absent, so every existing config is unaffected.
+    prompt_format = cfg.get("prompt_format", "shared")
+    constrained_decoding = cfg.get("constrained_decoding", "off")
 
     raw_rows: list[dict[str, Any]] = []
     parsed_rows: list[dict[str, Any]] = []
@@ -157,8 +219,10 @@ def run(config_path: str) -> dict[str, Any]:
             base_schema = task_base_schema(task)
             schema = drifted_schema(base_schema, drift)
             strict = strict_baseline and condition == "baseline"
-            prompt = build_prompt(task, schema)
+            prompt = build_prompt(task, schema, prompt_format=prompt_format)
             base_context = {"task": task, "condition": condition, "drift": drift}
+            tools = [schema_to_openai_tool(schema)] if prompt_format == "native" else None
+            response_schema = response_schema_for(constrained_decoding, schema)
 
             for trial_index, trial in enumerate(trials):
                 temperature = trial["temperature"]
@@ -166,7 +230,8 @@ def run(config_path: str) -> dict[str, Any]:
                 context = dict(base_context, trial_index=trial_index)
 
                 raw = client.generate(
-                    prompt, context, temperature=temperature, seed=trial_seed
+                    prompt, context, temperature=temperature, seed=trial_seed,
+                    tools=tools, response_schema=response_schema,
                 )
                 truncated = (
                     client.last_truncated() if hasattr(client, "last_truncated") else None
@@ -198,6 +263,8 @@ def run(config_path: str) -> dict[str, Any]:
                         retry_context,
                         temperature=temperature,
                         seed=trial_seed,
+                        tools=tools,
+                        response_schema=response_schema,
                     )
                     retry_truncated = (
                         client.last_truncated() if hasattr(client, "last_truncated") else None
@@ -302,6 +369,10 @@ def run(config_path: str) -> dict[str, Any]:
             # (2026-10-02 audit follow-up, item 4). {} for the mock client,
             # which has no backend_info().
             "model_backend": client.backend_info() if hasattr(client, "backend_info") else {},
+            # PLAN.md section 5, F1-F6 + F11: one explicit, unambiguous
+            # record of every factor level this run used (PLAN.md 10.1
+            # item 2: "All choices must be logged in run_manifest.json").
+            "run_factors": resolve_run_factors(cfg),
         },
     )
     return summary
