@@ -55,7 +55,21 @@ def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "share
     # schema drift is visible to the model exactly as the evaluator/executor
     # apply it; synthetic tasks render our internal schema.
     native = getattr(task, "tool_schema", None)
-    if getattr(task, "suite", "synthetic") == "bfcl" and native is not None:
+    candidates = getattr(task, "candidate_schemas", None)
+    if getattr(task, "suite", "synthetic") == "bfcl" and candidates is not None:
+        # BFCL "multiple" category (PLAN.md 10.1 item 3): every candidate is
+        # shown. The correct tool (matched by name -- drift never renames a
+        # tool, only its arguments, so schema["name"] == native["name"]
+        # always holds) renders the DRIFTED schema, exactly as the
+        # single-tool case; every distractor renders verbatim, never
+        # drift-perturbed, per PLAN.md section 3's "schema drift applies
+        # only to the gold tool's schema; distractor tools unchanged."
+        tools_native = [
+            to_native_doc(schema, candidate) if candidate.get("name") == schema.get("name") else candidate
+            for candidate in candidates
+        ]
+        tool_json = json.dumps({"tools": tools_native}, indent=2, sort_keys=True)
+    elif getattr(task, "suite", "synthetic") == "bfcl" and native is not None:
         tool_json = json.dumps({"tools": [to_native_doc(schema, native)]}, indent=2, sort_keys=True)
     else:
         tool_json = json.dumps({"tools": [schema]}, indent=2, sort_keys=True)
@@ -86,6 +100,10 @@ def resolve_run_factors(cfg: dict[str, Any]) -> dict[str, Any]:
         "F5_quant_level": model_cfg.get("quant_level", "unspecified"),
         "F6_sampling_preset": model_cfg.get("sampling_preset", "shared"),
         "F11_chat_wrapping": model_cfg.get("chat_wrapping", "legacy"),
+        # 2026-10-03: explicit regardless of provider (not just inside
+        # llama_cpp's own backend_info()) -- PLAN.md's n_ctx=4096-for-all-
+        # new-runs decision needs to be visible/auditable for every run.
+        "n_ctx": model_cfg.get("n_ctx", 4096),
     }
 
 

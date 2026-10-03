@@ -28,10 +28,18 @@ class Task:
     # Task-suite marker. "synthetic" (default) uses the global BASE_SCHEMAS;
     # "bfcl" carries its own schemas below (UpgradeCanary-BFCL-100).
     suite: str = "synthetic"
-    tool_schema: dict[str, Any] | None = None      # BFCL-native function doc
-    internal_schema: dict[str, Any] | None = None  # converted canonical schema
+    tool_schema: dict[str, Any] | None = None      # BFCL-native function doc (the CORRECT tool)
+    internal_schema: dict[str, Any] | None = None  # converted canonical schema (the CORRECT tool)
     acceptable: dict[str, Any] | None = None       # acceptable values per arg
     source_id: str | None = None                   # upstream task id
+    # BFCL "multiple" category (PLAN.md 10.1 item 3): every candidate tool
+    # shown to the model, as BFCL-native function docs, INCLUDING the
+    # correct one (tool_schema is always one of these entries, matched by
+    # name at prompt-build time). None for every other task (synthetic and
+    # BFCL "simple_python") -- those show exactly one tool, as before.
+    # Only the correct tool's schema (tool_schema/internal_schema) is ever
+    # drift-perturbed or scored against; distractors render verbatim.
+    candidate_schemas: list[dict[str, Any]] | None = None
 
 
 def load_tasks(path: str | Path) -> list[Task]:
@@ -49,6 +57,7 @@ def load_tasks(path: str | Path) -> list[Task]:
             internal_schema=row.get("internal_schema"),
             acceptable=row.get("acceptable"),
             source_id=row.get("source_id"),
+            candidate_schemas=row.get("candidate_schemas"),
         )
         for row in rows
     ]

@@ -68,13 +68,23 @@ def internal_from_native(fn_doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def rendered_prompt_chars(fn_doc: dict[str, Any], prompt: str) -> int:
-    """Length of the prompt the runner would send (eligibility rule 10)."""
+def rendered_prompt_chars(fn_doc: dict[str, Any], prompt: str, all_functions: list[dict[str, Any]] | None = None) -> int:
+    """Length of the prompt the runner would send (eligibility rule 10).
+
+    ``all_functions``, when given, measures the "multiple"-category prompt
+    (every candidate tool rendered, not just the correct one) -- the real
+    budget the model actually sees. ``None`` (default) keeps the original
+    single-tool measurement used by the simple_python eligibility check,
+    byte-for-byte unchanged.
+    """
     from types import SimpleNamespace
 
     from upgradecanary.runner import build_prompt
 
-    task = SimpleNamespace(suite="bfcl", tool_schema=fn_doc, prompt=prompt)
+    if all_functions is not None:
+        task = SimpleNamespace(suite="bfcl", tool_schema=fn_doc, candidate_schemas=all_functions, prompt=prompt)
+    else:
+        task = SimpleNamespace(suite="bfcl", tool_schema=fn_doc, prompt=prompt)
     return len(build_prompt(task, internal_from_native(fn_doc)))
 
 
@@ -325,6 +335,223 @@ def generate(data_dir: Path = DATA_DIR) -> dict[str, Any]:
                         "question_chars": len(item["task"]["prompt"]),
                         "suite": "bfcl",
                         "protocol": "UpgradeCanary-BFCL-100 selection protocol (docs/protocol.md)",
+                        "seed": SELECTION_SEED,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    return {"eligible": len(eligible), "rejected": rejected, "selected": len(selected), "strata": stats}
+
+
+# =============================================================================
+# BFCL "multiple" category (PLAN.md 10.1 item 3): the model is shown SEVERAL
+# candidate tool schemas and must pick the right one; still exactly one
+# correct call. Implemented as fully separate functions (never touching
+# is_eligible/convert/generate above) so the frozen simple_python selection
+# in docs/protocol.md cannot be affected even by an unintended refactor --
+# some logic below is intentionally duplicated from the simple_python path
+# rather than shared, as the safer choice. See docs/protocol.md's
+# "UpgradeCanary-BFCL-multiple-100 selection protocol" amendment and
+# analysis/plan/feasibility.md section f for the design this follows.
+# =============================================================================
+
+MULTIPLE_SOURCE_REL = Path(
+    "external/gorilla/berkeley-function-call-leaderboard/bfcl_eval/data/BFCL_v4_multiple.json"
+)
+MULTIPLE_ANSWERS_REL = Path(
+    "external/gorilla/berkeley-function-call-leaderboard/bfcl_eval/data/possible_answer/BFCL_v4_multiple.json"
+)
+
+
+def find_correct_function(functions: list[dict[str, Any]], truth_name: str) -> dict[str, Any] | None:
+    """The candidate in ``functions`` whose name matches the ground-truth
+    call's function name, or None if no candidate matches (defends against
+    malformed BFCL records -- never assume ``functions[0]`` is correct once
+    there is more than one candidate)."""
+    for fn in functions:
+        if fn.get("name") == truth_name:
+            return fn
+    return None
+
+
+def is_eligible_multiple(
+    record: dict[str, Any], answer: dict[str, Any] | None, max_prompt_chars: int = 1200
+) -> tuple[bool, str]:
+    """Eligibility for the "multiple" category: same checks as
+    ``is_eligible`` (printable ASCII, question length, no URL, required-arg
+    grounding, scalar-only values, rendered-prompt-length budget), but
+    requires >= 2 candidate functions (that is what "multiple" means for
+    this BFCL category) and resolves the CORRECT one by matching the
+    ground-truth call's function name rather than assuming index 0.
+
+    ``max_prompt_chars`` defaults to 1200 to literally match simple_python's
+    rule ("same selection rules otherwise" per PLAN.md 10.1 item 3) -- but
+    see docs/protocol.md's multiple-category amendment / ENGINEERING_NOTES.md:
+    at 1200, EVERY record in BFCL_v4_multiple.json is rejected (rendering
+    >= 2 full tool schemas is categorically longer than rendering one), so
+    this default alone cannot produce a 100-task suite. Pass an explicit,
+    protocol-decided value to actually select tasks.
+    """
+    if answer is None:
+        return False, "missing_answer"
+    functions = record.get("function") or []
+    if len(functions) < 2:
+        return False, "not_multiple"
+    ground_truth = answer.get("ground_truth") or []
+    if len(ground_truth) != 1:
+        return False, "ground_truth_count"
+    call = ground_truth[0]
+    if not isinstance(call, dict) or len(call) != 1:
+        return False, "ground_truth_shape"
+    truth_name = next(iter(call))
+    fn = find_correct_function(functions, truth_name)
+    if fn is None:
+        return False, "ground_truth_function_not_in_candidates"
+    text = question_text(record)
+    if any(ord(c) > 127 or not (c.isprintable() or c == "\t") for c in text):
+        return False, "not_printable_ascii"
+    if not (20 <= len(text) <= 400):
+        return False, "question_length"
+    low = text.lower()
+    if "http" in low or "www." in low:
+        return False, "url_in_question"
+    props = fn.get("parameters", {}).get("properties", {})
+    required = fn.get("parameters", {}).get("required", [])
+    truth_args = call[truth_name]
+    for req in required:
+        vals = truth_args.get(req)
+        grounded = vals is not None and any(str(v).lower() in low for v in vals)
+        has_default = "default" in props.get(req, {})
+        if not (grounded or has_default):
+            return False, f"ungrounded_required:{req}"
+    for pname, vals in truth_args.items():
+        if not isinstance(vals, list) or not vals:
+            return False, f"bad_values:{pname}"
+        for v in vals:
+            if isinstance(v, bool):
+                continue
+            if not isinstance(v, (str, int, float)):
+                return False, f"non_scalar:{pname}"
+    if rendered_prompt_chars(fn, text, all_functions=functions) >= max_prompt_chars:
+        return False, "prompt_too_long"
+    return True, "ok"
+
+
+def convert_multiple(record: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
+    """Like ``convert``, but ``tool`` / ``tool_schema`` / ``internal_schema``
+    / ``expected_call`` all point at the CORRECT candidate (resolved by
+    ground-truth name, never index 0), and ``candidate_schemas`` carries
+    every candidate (including the correct one) for prompt rendering.
+    """
+    functions = record["function"]
+    ground_truth = answer["ground_truth"][0]
+    truth_name = next(iter(ground_truth))
+    fn = find_correct_function(functions, truth_name)
+    if fn is None:
+        raise ValueError(f"ground-truth function {truth_name!r} not among candidates for {record['id']!r}")
+
+    props = fn.get("parameters", {}).get("properties", {})
+    required = set(fn.get("parameters", {}).get("required", []))
+    args_schema = {}
+    for pname, pspec in props.items():
+        args_schema[pname] = {
+            "type": _TYPE_MAP.get(pspec.get("type"), "string"),
+            "required": pname in required,
+        }
+    truth_args = ground_truth[truth_name]
+    acceptable = {}
+    canonical = {}
+    for pname, vals in truth_args.items():
+        type_name = args_schema.get(pname, {}).get("type", "string")
+        coerced = [_coerce_value(v, type_name) for v in vals]
+        acceptable[pname] = coerced
+        real = [v for v in coerced if v != ""]
+        if not real:
+            continue
+        canonical[pname] = real[0]
+    internal = {
+        "name": fn["name"],
+        "description": fn.get("description", ""),
+        "args": args_schema,
+    }
+    return {
+        "task_id": f"bfcl-multiple-{record['id']}",
+        "prompt": question_text(record),
+        "tool": fn["name"],
+        "expected_call": {"name": fn["name"], "arguments": canonical},
+        "condition_tags": list(CONDITIONS),
+        "drift_type": None,
+        "suite": "bfcl",
+        "tool_schema": fn,
+        "internal_schema": internal,
+        "acceptable": acceptable,
+        "source_id": record["id"],
+        "candidate_schemas": functions,
+    }
+
+
+def generate_multiple(data_dir: Path = DATA_DIR, max_prompt_chars: int = 1200) -> dict[str, Any]:
+    """Generate BFCL-multiple-100: same fixed SELECTION_SEED, same n=100,
+    same stratified largest-remainder selection (select_tasks(), reused
+    unchanged) as simple_python -- "same selection rules otherwise" per
+    PLAN.md 10.1 item 3. Writes data/bfcl_multiple_tasks.jsonl and
+    data/bfcl_multiple_tasks_provenance.jsonl; never touches
+    bfcl_tasks.jsonl (the simple_python file).
+
+    ``max_prompt_chars``: see is_eligible_multiple's docstring -- the
+    default (1200, matching simple_python) yields 0 eligible tasks for this
+    category and cannot select 100; this is a genuine, data-driven protocol
+    question (not a bug), flagged in ENGINEERING_NOTES.md pending a decision.
+    """
+    root = Path(__file__).resolve().parent.parent
+    records = load_jsonl(root / MULTIPLE_SOURCE_REL)
+    answer_by_id = {a["id"]: a for a in load_jsonl(root / MULTIPLE_ANSWERS_REL)}
+
+    eligible: list[dict[str, Any]] = []
+    seen_functions: set[str] = set()
+    rejected = 0
+    for record in records:
+        answer = answer_by_id.get(record["id"])
+        ok, _reason = is_eligible_multiple(record, answer, max_prompt_chars=max_prompt_chars)
+        if not ok:
+            rejected += 1
+            continue
+        truth_name = next(iter(answer["ground_truth"][0]))
+        fn = find_correct_function(record["function"], truth_name)
+        if fn["name"] in seen_functions:  # rule 11, on the CORRECT tool's name
+            rejected += 1
+            continue
+        seen_functions.add(fn["name"])
+        task = convert_multiple(record, answer)
+        eligible.append(
+            {
+                "task": task,
+                "signature": f"{type_signature(fn, answer['ground_truth'][0][truth_name])},n{len(record['function'])}",
+                "source_id": record["id"],
+                "function": fn["name"],
+            }
+        )
+
+    selected, stats = select_tasks(eligible)
+    data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    with open(data_dir / "bfcl_multiple_tasks.jsonl", "w", encoding="utf-8") as fh:
+        for item in selected:
+            fh.write(json.dumps(item["task"], ensure_ascii=False) + "\n")
+    with open(data_dir / "bfcl_multiple_tasks_provenance.jsonl", "w", encoding="utf-8") as fh:
+        for item in selected:
+            fh.write(
+                json.dumps(
+                    {
+                        "task_id": item["task"]["task_id"],
+                        "source_id": item["source_id"],
+                        "function": item["function"],
+                        "num_candidates": len(item["task"]["candidate_schemas"]),
+                        "signature": item["signature"],
+                        "question_chars": len(item["task"]["prompt"]),
+                        "suite": "bfcl",
+                        "protocol": "UpgradeCanary-BFCL-multiple-100 selection protocol (docs/protocol.md)",
                         "seed": SELECTION_SEED,
                     },
                     ensure_ascii=False,
