@@ -122,6 +122,7 @@ def test_resolve_run_factors_defaults():
         "F5_quant_level": "unspecified",
         "F6_sampling_preset": "shared",
         "F11_chat_wrapping": "legacy",
+        "n_ctx": 4096,
     }
 
 
@@ -130,6 +131,7 @@ def test_resolve_run_factors_reads_explicit_values():
         "model": {
             "max_tokens": 1024, "thinking": "off", "quant_level": "Q8_0",
             "sampling_preset": "recommended", "chat_wrapping": "native",
+            "n_ctx": 4096,
         },
         "prompt_format": "native",
         "constrained_decoding": "full_schema",
@@ -142,6 +144,7 @@ def test_resolve_run_factors_reads_explicit_values():
     assert factors["F5_quant_level"] == "Q8_0"
     assert factors["F6_sampling_preset"] == "recommended"
     assert factors["F11_chat_wrapping"] == "native"
+    assert factors["n_ctx"] == 4096
 
 
 def test_validate_run_factors_accepts_defaults():

@@ -8,7 +8,13 @@ reading the installed package's source directly (see ENGINEERING_NOTES.md).
 
 from __future__ import annotations
 
-from upgradecanary.model.llama_cpp_client import build_native_stop_list, resolve_native_prompt_text
+import pytest
+
+from upgradecanary.model.llama_cpp_client import (
+    build_native_stop_list,
+    check_context_budget,
+    resolve_native_prompt_text,
+)
 
 BOS = "<s>"
 BOS_ID = 1  # arbitrary stand-in id, matches common llama.cpp conventions
@@ -118,3 +124,22 @@ def test_stop_list_eos_only_when_model_has_no_dedicated_eot():
 
 def test_stop_list_empty_when_neither_present():
     assert build_native_stop_list("", "") == []
+
+
+def test_check_context_budget_passes_when_it_fits():
+    check_context_budget(prompt_token_count=100, max_tokens=256, n_ctx=2048)  # must not raise
+
+
+def test_check_context_budget_raises_when_it_does_not_fit():
+    with pytest.raises(RuntimeError, match="Context budget exceeded"):
+        check_context_budget(prompt_token_count=2000, max_tokens=1024, n_ctx=2048)
+
+
+def test_check_context_budget_exact_boundary_is_not_exceeded():
+    # prompt + max_tokens == n_ctx exactly: fits, does not raise.
+    check_context_budget(prompt_token_count=1792, max_tokens=256, n_ctx=2048)
+
+
+def test_check_context_budget_one_token_over_raises():
+    with pytest.raises(RuntimeError):
+        check_context_budget(prompt_token_count=1793, max_tokens=256, n_ctx=2048)

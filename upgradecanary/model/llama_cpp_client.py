@@ -76,6 +76,23 @@ def build_native_stop_list(eos_token: str, eot_token: str) -> list[str]:
     return stops
 
 
+def check_context_budget(prompt_token_count: int, max_tokens: int, n_ctx: int) -> None:
+    """Raise a clear error if a record cannot possibly fit -- never let
+    llama.cpp silently truncate the PROMPT to make room (2026-10-03
+    follow-up: F1 tests max_tokens=1024, and native/multi-tool prompts can
+    be long enough that prompt_tokens + max_tokens exceeds n_ctx). Checked
+    once per generate() call, both chat_wrapping modes. Pure function,
+    independently testable."""
+    if prompt_token_count + max_tokens > n_ctx:
+        raise RuntimeError(
+            f"Context budget exceeded: prompt_tokens({prompt_token_count}) + "
+            f"max_tokens({max_tokens}) = {prompt_token_count + max_tokens} > "
+            f"n_ctx({n_ctx}). Raise n_ctx, lower max_tokens, or shorten the "
+            "prompt (e.g. fewer BFCL-multiple candidate tools) -- this run "
+            "is stopped rather than silently truncating the prompt."
+        )
+
+
 def _add_bundled_cuda_dll_dirs() -> None:
     """Register NVIDIA CUDA runtime DLL folders bundled in the current venv.
 
@@ -112,9 +129,10 @@ class LlamaCppClient:
 
         # -1 puts all layers on the GPU; a Q4_K_M 7-8B model fits comfortably in 8GB.
         # CPU-only llama-cpp-python builds simply ignore n_gpu_layers.
+        self._n_ctx = int(model_cfg.get("n_ctx", 4096))
         self._llm = Llama(
             model_path=path,
-            n_ctx=int(model_cfg.get("n_ctx", 4096)),
+            n_ctx=self._n_ctx,
             n_gpu_layers=int(model_cfg.get("n_gpu_layers", -1)),
             seed=int(model_cfg.get("seed", 0)),
             verbose=False,
@@ -191,7 +209,7 @@ class LlamaCppClient:
             "provider": "llama_cpp",
             "llama_cpp_python_version": _llama_cpp_version,
             "model_path": path,
-            "n_ctx": int(model_cfg.get("n_ctx", 4096)),
+            "n_ctx": self._n_ctx,
             "n_gpu_layers": int(model_cfg.get("n_gpu_layers", -1)),
             "sampling_defaults_not_overridden": {
                 "top_p": self._top_p,
@@ -298,6 +316,20 @@ class LlamaCppClient:
             stop = merged or None
         elif self._prompt_template is not None:
             prompt = self._prompt_template.format(prompt=prompt)
+
+        # 2026-10-03: context-budget check, both wrapping modes -- raise
+        # rather than let llama.cpp silently truncate the prompt. Native
+        # wrapping already has token IDs (prompt is a List[int] by this
+        # point); legacy wrapping still has the final wrapped string, so it
+        # needs one tokenize() call purely to count (add_bos=True matches
+        # create_completion's own default for a string prompt, so the count
+        # reflects exactly what it will send).
+        if isinstance(prompt, list):
+            prompt_token_count = len(prompt)
+        else:
+            prompt_token_count = len(self._llm.tokenize(prompt.encode("utf-8"), add_bos=True, special=True))
+        check_context_budget(prompt_token_count, self._max_tokens, self._n_ctx)
+
         # Per-call temperature/seed support repeated trials. llama-cpp-python
         # accepts both per call; seeding is best-effort on GPU (see README).
         kwargs: dict[str, Any] = {
