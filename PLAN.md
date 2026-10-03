@@ -41,7 +41,7 @@ Total: 16 models, 10 adjacent pairs (4 design, 6 held-out). Size-changing pairs 
 |---|---|---|
 | Synthetic-100 | 100 | Kept as-is. Clean baseline is near ceiling; reported as the "saturated clean suite" case. |
 | BFCL-simple-100 | 100 | As before (deterministic selection, fixed seed). |
-| BFCL-multiple-100 (new) | 100 | Model must pick the right tool among several. Schema drift applies **only to the gold tool's schema**; distractor tools unchanged. |
+| BFCL-multiple-100 (new) | 100 | Model must pick the right tool among several. Schema drift applies **only to the gold tool's schema**; distractor tools unchanged. **Eligibility uses a 3500-char rendered-prompt budget, not BFCL-simple-100's 1200** -- rendering 2+ full tool schemas is categorically longer than rendering one (every one of the 200 source records in `BFCL_v4_multiple.json` exceeds 1200 chars; minimum was 1250, median 2388). At 3500 chars, 109/200 records are eligible, from which the usual seeded stratified selection picks 100. **Limitation: this biases BFCL-multiple-100 toward shorter multi-tool tasks** (fewer/simpler candidate tools, shorter questions) relative to the full `BFCL_v4_multiple.json` population -- report this explicitly alongside any BFCL-multiple-100 result. |
 
 Conditions per task: `baseline`, `schema_drift` (field rename, field drop, type mutation, unexpected field; enum drift on synthetic only), and **`fault_reporting` (redesigned)**.
 
