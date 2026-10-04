@@ -202,6 +202,14 @@ class LlamaCppClient:
         self._min_p = float(model_cfg.get("min_p", 0.05))
         self._repeat_penalty = float(model_cfg.get("repeat_penalty", 1.0))
         self._last_finish_reason: str | None = None
+        # 2026-10-04, PLAN.md 10.2 smoke-test instrumentation: the exact
+        # token IDs actually sent to create_completion for the most recent
+        # generate() call, so a caller can empirically verify BOS handling
+        # (e.g. "exactly one BOS token at prompt start") instead of only
+        # trusting the resolved flags in backend_info(). None until the
+        # first generate() call. Purely additive -- no existing behavior
+        # reads or depends on this.
+        self._last_prompt_token_ids: list[int] | None = None
 
         from llama_cpp import __version__ as _llama_cpp_version
 
@@ -325,10 +333,12 @@ class LlamaCppClient:
         # create_completion's own default for a string prompt, so the count
         # reflects exactly what it will send).
         if isinstance(prompt, list):
-            prompt_token_count = len(prompt)
+            prompt_token_ids = prompt
         else:
-            prompt_token_count = len(self._llm.tokenize(prompt.encode("utf-8"), add_bos=True, special=True))
+            prompt_token_ids = self._llm.tokenize(prompt.encode("utf-8"), add_bos=True, special=True)
+        prompt_token_count = len(prompt_token_ids)
         check_context_budget(prompt_token_count, self._max_tokens, self._n_ctx)
+        self._last_prompt_token_ids = prompt_token_ids
 
         # Per-call temperature/seed support repeated trials. llama-cpp-python
         # accepts both per call; seeding is best-effort on GPU (see README).
@@ -361,3 +371,13 @@ class LlamaCppClient:
         if self._last_finish_reason is None:
             return None
         return self._last_finish_reason == "length"
+
+    def last_prompt_token_ids(self) -> list[int] | None:
+        """Token IDs actually sent for the most recent generate() call (see
+        __init__'s docstring note on self._last_prompt_token_ids). None
+        before the first call."""
+        return self._last_prompt_token_ids
+
+    def bos_token_id(self) -> int:
+        """The model's BOS token id (-1 if it has none)."""
+        return self._llm.token_bos()
