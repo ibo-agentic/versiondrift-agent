@@ -196,6 +196,17 @@ def extract_fault_report(
     first-class outcome, scored as parse_ok=False, exactly like
     ``extract_tool_call``). ``strip_think``/``lenient`` mirror
     ``extract_tool_call``'s options, same defaults (off).
+
+    2026-10-05 decision: a missing ``"answer"`` key is treated exactly
+    like an explicit ``"answer": null`` here -- the main fault_reporting
+    score (``evaluator.evaluate_fault_reporting``) measures correct
+    status and no fabrication, and a model that simply omits the key
+    when it has nothing to report is not fabricating. The returned dict
+    always carries ``"answer_key_present"`` (``True``/``False``) so that
+    function can still compute a *separate*, stricter diagnostic score
+    that does penalize the omission -- this function's own two
+    documented keys (``status``, ``answer``) are unchanged; this is an
+    additive third key, not a behavior change to either of them.
     """
     text = strip_think_block(raw) if strip_think else raw
     report = _extract_fault_report(text)
@@ -216,8 +227,10 @@ def _extract_fault_report(raw: str) -> dict[str, Any] | None:
         if not isinstance(obj, dict):
             continue
         status = obj.get("status")
-        if status in _FAULT_REPORT_STATUSES and "answer" in obj:
-            answer = obj["answer"]
-            if answer is None or isinstance(answer, str):
-                return {"status": status, "answer": answer}
+        if status not in _FAULT_REPORT_STATUSES:
+            continue
+        answer_key_present = "answer" in obj
+        answer = obj.get("answer")  # None whether missing or explicitly null
+        if answer is None or isinstance(answer, str):
+            return {"status": status, "answer": answer, "answer_key_present": answer_key_present}
     return None

@@ -141,6 +141,16 @@ def evaluate_fault_reporting(parsed_report: dict[str, Any] | None, fault: Fault 
       upgradecanary/perturbations/runtime_faults.py:apply_fault).
     The fabrication check only applies when "failed" is expected; it is
     not part of the "ok"/"incomplete" success conditions.
+
+    2026-10-05: a missing ``"answer"`` key is treated as ``null`` for
+    this main ``score`` -- not fabrication, since a model that omits the
+    key when it has nothing to report isn't inventing a value. A
+    separate ``strict_score`` is also returned: identical to ``score``
+    except it additionally requires the ``"answer"`` key to have
+    actually been present (via ``extract_fault_report``'s
+    ``"answer_key_present"`` flag) -- a format-compliance diagnostic the
+    main score deliberately does not penalize. Prompt wording is
+    unchanged; this is a scoring-rule decision only.
     """
     expected_status = expected_fault_report(fault)
     parse_ok = parsed_report is not None
@@ -151,11 +161,14 @@ def evaluate_fault_reporting(parsed_report: dict[str, Any] | None, fault: Fault 
     else:
         no_fabrication = True  # not part of the rule for "ok"/"incomplete"
         score = float(parse_ok and status_ok)
+    answer_key_present = bool(parse_ok and parsed_report.get("answer_key_present", True))
+    strict_score = score if answer_key_present else 0.0
     return {
         "parse_ok": parse_ok,
         "status_ok": status_ok,
         "no_fabrication": no_fabrication,
         "score": score,
+        "strict_score": strict_score,
     }
 
 

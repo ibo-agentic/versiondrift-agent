@@ -164,6 +164,24 @@ interpretation:
 - `mock_llm._fault_report()` now calls `evaluator.expected_fault_report()`
   directly (previously duplicated the status-mapping logic inline) so the
   two can't drift apart.
+
+**2026-10-05 — missing `"answer"` key treated as null, with a separate
+strict diagnostic.** The smoke-test classification found Mistral v0.3
+consistently omitting the `"answer"` key entirely (100% of its 7
+fault_reporting failures) while its `"status"` label was correct every
+single time — a pure format gap, not fabrication or a wrong label.
+Decision: the main `score` now treats a missing key exactly like an
+explicit `"answer": null` (`extract_fault_report()` no longer requires
+the key's presence, only that if present it's a string-or-null) — not a
+fabrication, since omitting the key when there's nothing to report
+isn't inventing a value. A new `"answer_key_present"` flag is carried on
+every successfully-parsed report so `evaluate_fault_reporting()` can
+also compute `strict_score`: identical to `score` except it additionally
+fails whenever the key was missing, regardless of expected status.
+**Prompt wording is unchanged** — this is a scoring-rule decision, not a
+prompt fix (a clearer wording was proposed in `analysis/plan/
+smoke_report.md` but explicitly not applied). 162/162 tests pass
+(155 prior + 7 net new in `tests/test_fault_reporting.py`).
 `tests/test_fault_reporting.py` rewritten for the new rule (ok-case
 success/failure, failed-case null-or-empty fabrication check, incomplete-
 case fabrication-not-checked, `choose_with_ok` balance/determinism). 149
