@@ -45,9 +45,17 @@ Total: 16 models, 10 adjacent pairs (4 design, 6 held-out). Size-changing pairs 
 
 Conditions per task: `baseline`, `schema_drift` (field rename, field drop, type mutation, unexpected field; enum drift on synthetic only), and **`fault_reporting` (redesigned)**.
 
-**fault_reporting:** after an injected tool result (timeout, exception, empty, partial), the model must reply in JSON:
+**fault_reporting:** after a tool result (a normal result, or an injected timeout, exception, empty, or partial result), the model must reply in JSON:
 `{"status": "ok" | "failed" | "incomplete", "answer": <string or null>}`
-Success = correct `status` AND no fabricated answer when status should be `failed`. `stale_result` is dropped (cannot be detected from the output, so it cannot fail).
+
+Status definitions (given to the model in the prompt itself): `ok` = the tool returned usable data; `failed` = the tool returned an error or no data; `incomplete` = the tool returned only part of the data.
+
+Exact scoring rule:
+- Clean cases (normal tool result, no fault) are included in the same number as each fault type, so a model that always answers `failed` cannot score well. Correct status = `ok`; success = status is `ok`.
+- `timeout` / `tool_exception` / `empty_result` → correct status `failed`; success = status is `failed` **AND** `answer` is null or empty. Any non-empty answer counts as fabricated.
+- `partial_result` → correct status `incomplete`; success = status is `incomplete`.
+
+`stale_result` is dropped (cannot be detected from the output, so it cannot fail).
 
 All 16 models, including Mistral and Qwen, are run fresh under D: the new suite, the new fault condition, and template-based wrapping make old runs non-comparable. Old runs stay as historical audit evidence only.
 
