@@ -1,8 +1,11 @@
-# PLAN — Upgrade-Verdict Stability Study (pre-registration, DRAFT v0.1)
+# PLAN — Upgrade-Verdict Stability Study (pre-registration, v1, BINDING)
 
 Working title: *Same Upgrade, Different Verdict: How Evaluation Setup Choices Flip Model-Upgrade Decisions for Tool Agents*
 
-Status: DRAFT. Becomes binding when committed. Any change after commit goes in `DEVIATIONS.md` with date and reason.
+Status: **BINDING**, committed as PLAN v1 (git tag `plan-v1`) on 2026-10-05,
+after PLAN.md 10.2's smoke tests and their follow-up fixes. Any change
+from this point on goes in `DEVIATIONS.md` with date and reason — this
+file itself is not edited again except to fix a typo.
 
 ---
 
@@ -57,6 +60,15 @@ Exact scoring rule:
 
 `stale_result` is dropped (cannot be detected from the output, so it cannot fail).
 
+**Missing `"answer"` key (decided 2026-10-05, found via smoke-test
+classification):** treated as `null` for the main score above — a model
+that omits the key when it has nothing to report is not fabricating. A
+separate **strict diagnostic score** is also computed and reported
+alongside the main score (never substituted for it): identical to the
+rule above, but additionally requires the `"answer"` key to have
+actually been present in the JSON, regardless of expected status. Prompt
+wording is unchanged by this decision.
+
 All 16 models, including Mistral and Qwen, are run fresh under D: the new suite, the new fault condition, and template-based wrapping make old runs non-comparable. Old runs stay as historical audit evidence only.
 
 The old `runtime_fault` condition is not rerun. It is reported in the paper only as historical "retry after tool failure".
@@ -71,6 +83,7 @@ Trials: 1 greedy + 2 sampled per task-condition (same as before).
 |---|---|
 | Chat wrapping | each model's own chat template, read from the GGUF metadata (plain turns only, no tool template) |
 | Prompt format | shared JSON-in-prompt: tool docs written in the prompt text (current harness) |
+| Context window | `n_ctx = 4096` for every model (decided 2026-10-03, confirmed sufficient for all 16 models in the 2026-10-05 smoke tests — peak VRAM never exceeded 6.7 GiB on the 8 GB card) |
 | Max output tokens | 256 |
 | Thinking (Qwen3 only) | model default (on) |
 | Parsing | strict JSON |
@@ -99,6 +112,23 @@ Stress diff = mean paired success difference (new − old) over the stress condi
 | F9 | Gate rule | point threshold / CI gate (Section 8) | No — rescore |
 | F10 | Trials | 1 (greedy only) / 3 | No — subsample |
 | F11 | Chat wrapping | legacy (old hand-built template string) / native (GGUF's own chat template) | Yes — Mistral and Qwen models only |
+
+**F3 implementation notes (decided 2026-10-05, found via smoke tests):**
+Not every model's chat template renders a top-level `tools=` template
+variable — confirmed for Phi-4-mini, whose template only reads a
+`"tools"` field on a `system`-role message (pre-serialized as a JSON
+string, not a Python object). Passing `tools=` the standard way
+silently produced a tool-less prompt for that one model (0% tool-call
+parse rate in the smoke test, no exception). Fix: the harness renders
+normally first, and if any tool's name doesn't appear in the rendered
+prompt, retries once with that system-message form before giving up.
+**General safety check, every model, F3 only:** after rendering, every
+tool name must appear in the rendered prompt text; if it still doesn't
+after the retry, the run stops with a clear error rather than silently
+sending a tool-less prompt. F3's task-framing/question text is
+otherwise identical to `shared`'s — only the tool-format instruction
+(schema-in-prompt vs. native `tools=`) differs (confirmed and fixed
+2026-10-05; see `docs/ENGINEERING_NOTES.md`).
 
 **F4 note:** a full-schema grammar built from the drifted schema forces the drifted field names and types, so the model no longer has to adapt to drift by itself. That level changes what `schema_drift` measures. It is kept because real deployments use strict structured output, but it is analyzed separately and is not part of the nuisance set or of R.
 
@@ -148,12 +178,15 @@ Each hypothesis is reported as supported / not supported, with numbers, whicheve
 
 ## 10. Order of work
 
-1. **Engineering** (no model runs): config switches for F1–F6; BFCL-multiple loader; `fault_reporting` condition; A/A and positive-control configs; all analysis scripts idempotent; tests pass.
-2. **Smoke tests:** every model, 5 tasks, check template render, JSON parse, truncation flag. Confirm each GGUF actually contains `tokenizer.chat_template` (needed for D's wrapping and for F3). Verify Llama-3.1, Phi-4-mini, and Granite native tool templates render with a tool list. Check Gemma-2-9b memory fit. **Over-generation check:** flag any output that contains a role marker or end-of-turn text (e.g. `<|start_header_id|>`, `<|im_start|>`, `<|eot_id|>`, `<end_of_turn>`, `<|end|>`, `<|assistant|>`) — this would mean generation ran past the intended turn despite the stop list.
-3. **Commit this PLAN.md** (binding from here).
+1. ~~**Engineering** (no model runs): config switches for F1–F6; BFCL-multiple loader; `fault_reporting` condition; A/A and positive-control configs; all analysis scripts idempotent; tests pass.~~ **Done.**
+2. ~~**Smoke tests:** every model, 5 tasks, check template render, JSON parse, truncation flag. Confirm each GGUF actually contains `tokenizer.chat_template` (needed for D's wrapping and for F3). Verify Llama-3.1, Phi-4-mini, and Granite native tool templates render with a tool list. Check Gemma-2-9b memory fit. **Over-generation check:** flag any output that contains a role marker or end-of-turn text (e.g. `<|start_header_id|>`, `<|im_start|>`, `<|eot_id|>`, `<end_of_turn>`, `<|end|>`, `<|assistant|>`) — this would mean generation ran past the intended turn despite the stop list.~~ **Done 2026-10-05** — `analysis/plan/smoke_report.md` (16 models, 40 model×config rows, 1,800 generations). Gemma-2-9b memory fit was not checked (not one of the 16 core models; no Q8_0/Q2_K files downloaded this pass either — out of scope for this smoke-test round). All three fixes it found are applied (Phi-4-mini F3, F3/D prompt-text parity, fault_reporting missing-answer rule) and folded into this plan above.
+3. ~~**Commit this PLAN.md** (binding from here).~~ **Done 2026-10-05, tag `plan-v1`.**
 4. **Runs:** D on all models first, then factors, then controls, then R.
+   Written to `results_v2/<protocol>/<model>/<suite>/` — never into
+   `results/` (pre-plan-v1 historical runs, kept as audit evidence only
+   per Section 3) or `results_smoke/` (engineering smoke tests only).
 5. **Analysis** exactly as Sections 8–9. Extra analyses allowed but labeled "exploratory".
-6. Back up `results/` after every batch of runs.
+6. Back up `results_v2/` after every batch of runs.
 
 ---
 
