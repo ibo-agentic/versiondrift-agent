@@ -167,3 +167,61 @@ def test_validate_run_factors_rejects_bad_enum_values():
         validate_run_factors({"model": {}, "constrained_decoding": "weird"})
     with pytest.raises(ValueError):
         validate_run_factors({"model": {"sampling_preset": "weird"}})
+
+
+# --- PLAN.md section 6 positive control (b): prompt_format "no_description" ---
+
+WEATHER_NATIVE_LIKE = {
+    "name": "get_weather",
+    "description": "Get the current weather for a city.",
+    "args": {
+        "city": {"type": "string", "required": True},
+    },
+}
+
+
+def test_build_prompt_no_description_strips_top_level_description():
+    task = _make_task()
+    shared = build_prompt(task, WEATHER_NATIVE_LIKE, prompt_format="shared")
+    stripped = build_prompt(task, WEATHER_NATIVE_LIKE, prompt_format="no_description")
+    assert "Get the current weather" in shared
+    assert "Get the current weather" not in stripped
+    assert "get_weather" in stripped  # name preserved
+    assert '"required": true' in stripped  # structure preserved
+
+
+def test_build_prompt_no_description_strips_nested_arg_descriptions():
+    from upgradecanary.runner import _strip_descriptions
+
+    native_doc = {
+        "name": "f",
+        "description": "top",
+        "parameters": {
+            "properties": {
+                "x": {"type": "integer", "description": "the x value"},
+            },
+            "required": ["x"],
+        },
+    }
+    stripped = _strip_descriptions(native_doc)
+    assert "description" not in stripped
+    assert "description" not in stripped["parameters"]["properties"]["x"]
+    assert stripped["parameters"]["properties"]["x"]["type"] == "integer"
+
+
+def test_build_prompt_no_description_works_on_a_list_of_candidates():
+    from upgradecanary.runner import _strip_descriptions
+
+    docs = [{"name": "a", "description": "A"}, {"name": "b", "description": "B"}]
+    stripped = _strip_descriptions(docs)
+    assert stripped == [{"name": "a"}, {"name": "b"}]
+
+
+def test_build_prompt_rejects_unknown_format_still_works():
+    task = _make_task()
+    with pytest.raises(ValueError):
+        build_prompt(task, WEATHER_NATIVE_LIKE, prompt_format="weird")
+
+
+def test_validate_run_factors_accepts_no_description():
+    validate_run_factors({"model": {}, "prompt_format": "no_description"})  # must not raise

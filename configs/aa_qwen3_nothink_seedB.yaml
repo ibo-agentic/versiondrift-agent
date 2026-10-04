@@ -1,0 +1,53 @@
+# A/A null-pair example (PLAN.md section 6): the SAME model
+# (real_trials_qwen3_nothink.yaml) rerun with a different SAMPLING seed
+# only -- seed (top-level, drives perturbation/fault assignment) is
+# unchanged so this is a clean, confound-free comparison of sampling
+# variability alone. Correct verdict when compared against
+# real_trials_qwen3_nothink.yaml's own run: always neutral; a harmful or
+# beneficial verdict here would be a false alarm.
+#
+# This is a MECHANISM EXAMPLE, not a full PLAN.md D-protocol run: it keeps
+# real_trials_qwen3_nothink.yaml's legacy chat_wrapping/old suite as-is.
+# PLAN.md asks for A/A pairs across >= 6 models x 3 suites; the other 15
+# model/suite combinations need their own D-protocol base config to exist
+# first (a later step -- see docs/ENGINEERING_NOTES.md) before an A/A
+# variant of each can be written the same way this one was: copy the base
+# config, keep "seed" the same, change model.seed/trial_seeds, rename
+# "experiment".
+
+experiment: upgradecanary-aa-qwen3-nothink-seedB
+seed: 1234                        # SAME as the base run -- same perturbation/fault assignment
+
+data: data/base_tasks.jsonl
+output_dir: results
+# no task_limit: all 100 tasks
+
+conditions: [baseline, schema_drift, runtime_fault]
+
+trials: 3
+trial_temperatures: [0.0, 0.7, 0.7]
+trial_seeds: [9001, 9002, 9003]   # DIFFERENT sampling seeds -- this is the only intended difference
+
+model:
+  provider: llama_cpp
+  path: models/qwen/Qwen3-8B-Q4_K_M.gguf
+  n_ctx: 2048
+  n_gpu_layers: -1
+  temperature: 0.0
+  max_tokens: 256
+  seed: 9001                      # different model-level seed too
+  prompt_template: "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  stop: ["<|im_end|>"]
+
+parsing:
+  strip_think_block: true
+
+perturbations:
+  schema_drift:
+    enabled: [field_rename, field_drop, type_mutation, unexpected_field, enum_drift]
+  runtime_faults:
+    enabled: [timeout, tool_exception, empty_result, stale_result, partial_result]
+    retry_once: true
+
+executor:
+  strict_baseline_args: true

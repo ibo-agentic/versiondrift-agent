@@ -69,6 +69,23 @@ def build_fault_reporting_prompt(task: Task, fault: Fault) -> str:
     )
 
 
+def _strip_descriptions(obj: Any) -> Any:
+    """Recursively drop every key literally named "description" (PLAN.md
+    section 6 positive control (b): "prompt with tool descriptions
+    removed" -- a deliberately damaged copy of the prompt, used to confirm
+    the gate detects a real regression). Format-agnostic: works on this
+    project's internal schema shape and on BFCL-native function docs
+    (including a "multiple"-category list of several docs) alike, since
+    both just nest "description" keys at different depths. Names, types,
+    and "required" are untouched -- only the free-text description is
+    removed."""
+    if isinstance(obj, dict):
+        return {k: _strip_descriptions(v) for k, v in obj.items() if k != "description"}
+    if isinstance(obj, list):
+        return [_strip_descriptions(v) for v in obj]
+    return obj
+
+
 def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "shared") -> str:
     # PLAN.md F3: "native" sends only the bare question -- the model's own
     # chat template renders the tool definitions from the tools= list
@@ -78,8 +95,8 @@ def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "share
     # equivalent under a model's native tool template.
     if prompt_format == "native":
         return task.prompt
-    if prompt_format != "shared":
-        raise ValueError(f"prompt_format must be 'shared' or 'native', got {prompt_format!r}")
+    if prompt_format not in ("shared", "no_description"):
+        raise ValueError(f"prompt_format must be 'shared', 'native', or 'no_description', got {prompt_format!r}")
     # BFCL-derived tasks render the BFCL-native form of the PASSED schema, so
     # schema drift is visible to the model exactly as the evaluator/executor
     # apply it; synthetic tasks render our internal schema.
@@ -93,15 +110,17 @@ def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "share
         # single-tool case; every distractor renders verbatim, never
         # drift-perturbed, per PLAN.md section 3's "schema drift applies
         # only to the gold tool's schema; distractor tools unchanged."
-        tools_native = [
+        tools = [
             to_native_doc(schema, candidate) if candidate.get("name") == schema.get("name") else candidate
             for candidate in candidates
         ]
-        tool_json = json.dumps({"tools": tools_native}, indent=2, sort_keys=True)
     elif getattr(task, "suite", "synthetic") == "bfcl" and native is not None:
-        tool_json = json.dumps({"tools": [to_native_doc(schema, native)]}, indent=2, sort_keys=True)
+        tools = [to_native_doc(schema, native)]
     else:
-        tool_json = json.dumps({"tools": [schema]}, indent=2, sort_keys=True)
+        tools = [schema]
+    if prompt_format == "no_description":
+        tools = _strip_descriptions(tools)
+    tool_json = json.dumps({"tools": tools}, indent=2, sort_keys=True)
     return (
         "You are an agent that answers questions by calling tools.\n"
         f"Available tool schema:\n{tool_json}\n"
@@ -145,8 +164,8 @@ def validate_run_factors(cfg: dict[str, Any]) -> None:
     sampling_preset = model_cfg.get("sampling_preset", "shared")
     chat_wrapping = model_cfg.get("chat_wrapping", "legacy")
 
-    if prompt_format not in ("shared", "native"):
-        raise ValueError(f"prompt_format must be 'shared' or 'native', got {prompt_format!r}")
+    if prompt_format not in ("shared", "native", "no_description"):
+        raise ValueError(f"prompt_format must be 'shared', 'native', or 'no_description', got {prompt_format!r}")
     if constrained_decoding not in ("off", "generic_json", "full_schema"):
         raise ValueError(
             f"constrained_decoding must be 'off', 'generic_json', or 'full_schema', got {constrained_decoding!r}"
