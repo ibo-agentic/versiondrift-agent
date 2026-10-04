@@ -169,19 +169,36 @@ actually sees the tools. D and F4 for Phi-4-mini remain 100% unaffected
 (they never use `tools=`). See
 `docs/ENGINEERING_NOTES.md` section 3 for the full writeup.
 
-**2. [MEDIUM] Qwen3's default "thinking" burns through the D protocol's
-256-token budget.** D and F3 both show markedly worse truncation (40%,
-47%) and parse rate (67%, 57%) than every other model (all ≥87%, most
-100%) — confirmed by inspecting a raw record: the model emits a full
-`<think>...</think>` block before the JSON answer, and on tasks where
-that reasoning runs long, the 256-token cap is hit before the real answer
-appears (also explains Qwen3's much higher seconds/record: ~5.2-5.5s vs.
-0.3-1.6s for every other model). F4 is less affected (100% parse, 18%
-truncation) since the grammar still forces valid JSON once generation
-reaches that point. PLAN.md's D protocol fixes `max_tokens=256` without
-specifying `model.thinking`; Qwen3 defaults to thinking on. Not fixed —
-whether D should force `thinking: off` for Qwen3, or budget it
-separately, is a protocol decision, not an engineering bug.
+**2. [MEDIUM, decision: leave D as-is] Qwen3's default "thinking" burns
+through the D protocol's 256-token budget.** D and F3 both show markedly
+worse truncation (40%, 47% aggregate) and parse rate (67%, 57%) than
+every other model (all ≥87%, most 100%) — confirmed by inspecting a raw
+record: the model emits a full `<think>...</think>` block before the
+JSON answer, and on tasks where that reasoning runs long, the 256-token
+cap is hit before the real answer appears (also explains Qwen3's much
+higher seconds/record: ~5.2-5.5s vs. 0.3-1.6s for every other model). F4
+is less affected (100% parse, 18% truncation) since the grammar still
+forces valid JSON once generation reaches that point.
+
+**Decision: D is not changed.** This is the intended typical setup, and
+F1 (max_tokens)/F2 (thinking) are the factors that test exactly this
+axis — not something D itself should special-case per model. Every
+model × suite combination under D with truncation > 2%, for the record:
+
+| Model | Suite | Truncation rate |
+|---|---|---|
+| qwen3 | bfcl_simple | 0.467 (7/15) |
+| qwen3 | bfcl_multiple | 0.733 (11/15) |
+| phi35_mini | bfcl_simple | 0.200 (3/15) |
+| phi35_mini | bfcl_multiple | 0.067 (1/15) |
+
+Every other model × suite combination under D is 0.000. Qwen3's
+synthetic suite is also 0.000 — the truncation is specific to BFCL's
+longer/more-complex prompts leaving less of the 256-token budget for
+the `<think>` block to finish in, and worst on `bfcl_multiple` (longest
+prompts, multiple candidate tools). Phi-3.5-mini's smaller, non-thinking
+truncation (20%/7% on the same two suites) is a separate, much milder
+effect worth noting but not investigated further here.
 
 **3. [LOW-MEDIUM] Granite-3.0's actual output tag differs from
 Granite-3.1 and -3.2's.** 3.1 and 3.2 both emit paired
