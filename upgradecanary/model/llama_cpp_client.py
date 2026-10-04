@@ -76,6 +76,31 @@ def build_native_stop_list(eos_token: str, eot_token: str) -> list[str]:
     return stops
 
 
+def missing_tool_names(rendered_prompt: str, tools: list[dict[str, Any]]) -> list[str]:
+    """Which tool names (from an OpenAI-style ``tools=`` list) do not
+    appear anywhere in the rendered prompt text.
+
+    PLAN.md 10.2 smoke-test follow-up (2026-10-05): a silent harness
+    failure found in the smoke tests -- a chat template can accept a
+    ``tools=`` kwarg without error but never actually render it.
+    Confirmed for Phi-4-mini's own ``chat_template`` (fetched directly
+    from its ``tokenizer_config.json``): it only reads a per-message
+    ``"tools"`` field on a ``system`` message, never the top-level
+    ``tools`` template variable every other model's template here reads.
+    Passing ``tools=`` as that top-level kwarg (this project's one
+    mechanism until now) silently produced a prompt with no tool
+    information at all for that one model -- no exception, just 0%
+    downstream parse rate.
+
+    Used both as the trigger for the system-message fallback in
+    ``LlamaCppClient.generate()`` and as the final backstop check before
+    it raises -- so this now applies to every model in F3 mode, not only
+    the one it was found on.
+    """
+    names = [t.get("function", {}).get("name", "") for t in tools]
+    return [n for n in names if n and n not in rendered_prompt]
+
+
 def check_context_budget(prompt_token_count: int, max_tokens: int, n_ctx: int) -> None:
     """Raise a clear error if a record cannot possibly fit -- never let
     llama.cpp silently truncate the PROMPT to make room (2026-10-03
@@ -305,6 +330,36 @@ class LlamaCppClient:
                 tools=tools,
                 **render_kwargs,
             )
+            if tools:
+                missing = missing_tool_names(rendered.prompt, tools)
+                if missing:
+                    # Some templates (confirmed: Phi-4-mini) only look for
+                    # a per-message "tools" field on a system message, not
+                    # the top-level kwarg just passed above -- retry with
+                    # that convention before giving up. tools is JSON-
+                    # encoded to a string because Phi-4-mini's template
+                    # does raw string concatenation ('<|tool|>' + message
+                    # ['tools'] + '<|/tool|>'), not a render of a Python
+                    # object.
+                    fallback_messages = [
+                        {"role": "system", "content": "", "tools": json.dumps(tools)},
+                        {"role": "user", "content": prompt},
+                    ]
+                    rendered = self._native_formatter(
+                        messages=fallback_messages, tools=tools, **render_kwargs
+                    )
+                    missing = missing_tool_names(rendered.prompt, tools)
+                    if missing:
+                        raise RuntimeError(
+                            f"F3 native tool format: tool name(s) {missing} do not "
+                            "appear anywhere in the rendered prompt for this model's "
+                            "chat template, even after retrying with tools attached "
+                            "to a system message (the one other known convention). "
+                            "This model's template likely uses a third, unsupported "
+                            "convention for passing tools -- inspect its "
+                            "tokenizer_config.json chat_template directly rather than "
+                            "silently sending a tool-less prompt."
+                        )
             # Check 1: pre-tokenize ourselves with the resolved add_bos
             # decision and pass token IDs (not a string) to create_completion
             # -- a List[int] prompt makes create_completion skip its own

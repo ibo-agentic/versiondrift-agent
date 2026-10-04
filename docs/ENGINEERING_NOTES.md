@@ -232,11 +232,40 @@ test's pattern), including a regression guard pinning down the documented
    handling for any real model.
 2. **`enable_thinking`'s exact template variable name is a guess**, not
    confirmed against Qwen3's actual embedded template text.
-3. **F3 native mode now parses every documented native tool-call format**
-   (parameters-alias, list-wrapped, and four tag-wrapped conventions —
-   2026-10-04 follow-up), except Phi-4-mini's, which is a best-effort
-   guess with no confirmed official example — check its `parse_failure`
-   rate specifically at smoke-test time.
+3. **Resolved 2026-10-05 (was a silent harness failure found in smoke
+   tests, not a parsing gap)**: F3 native mode now parses every
+   documented native tool-call format (parameters-alias, list-wrapped,
+   and four tag-wrapped conventions — 2026-10-04 follow-up). Phi-4-mini
+   specifically was flagged above as "best-effort guess, unconfirmed" —
+   the smoke test found something worse than a wrong parser guess: its
+   `tools=` list never reached the model's prompt AT ALL.
+   `LlamaCppClient._build_native_formatter`/`generate()` passed `tools=`
+   as a top-level Jinja render variable (the convention every other
+   model's template here reads), but Phi-4-mini's own `chat_template`
+   (fetched directly from its `tokenizer_config.json` this session) only
+   checks `'tools' in message` on a `system`-role message — the
+   top-level variable is simply never referenced, so the template
+   silently rendered a tool-less prompt. No exception, no warning — the
+   call succeeded and only the smoke test's actual parse-rate number
+   (0%, zero detected tool-call attempts of ANY shape) exposed it.
+   **Fix**: `generate()` now renders normally first, then checks (new
+   `missing_tool_names()`) whether every tool name actually appears in
+   the rendered text; if not, it retries once with a `system` message
+   carrying `{"tools": json.dumps(tools)}` (Phi-4-mini's exact
+   convention — string concatenation in its template means `tools` must
+   already be a JSON string, not a Python object) before giving up with
+   a clear `RuntimeError`. This check now runs for every model in F3
+   mode, not just Phi-4-mini — a template using some third, still-unknown
+   convention will raise instead of silently dropping tools again.
+   Verified against Phi-4-mini's real template text in
+   `tests/test_native_tool_rendering.py` (reproduces the original bug,
+   then proves the fallback fixes it) and against the real model:
+   parse rate went from 0% to 50% (`analysis/plan/smoke_report.md`'s
+   rerun). The remaining 50% is genuine model non-compliance, not a
+   rendering problem — confirmed per-suite: synthetic 10/10, BFCL-simple
+   5/10, BFCL-multiple 0/10; the failures are the model explaining how
+   to call the function in prose/Python instead of emitting the
+   requested JSON, worse as the prompt gets more BFCL-native/multi-tool.
 4. **F4 `full_schema`'s use of JSON Schema `const`** is unverified against
    llama.cpp's grammar converter.
 5. **Resolved 2026-10-04**: `fault_reporting`'s status-mapping and

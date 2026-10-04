@@ -58,11 +58,12 @@ an optional extra "if smoke test fits 8GB"), every Q8_0 and Q2_K file
 - **Llama-3.1's `"parameters"` key (F3) parsed at 100%** — confirms the
   `parameters_alias` handling added in today's Fix 2 works on a real
   model's actual output, not just the synthetic test fixtures.
-- Granite 3.0/3.1/3.2 and Llama-3.1 all render a real tool list under F3
-  (directly verified by rendering their templates with the same `tools=`
-  input the harness used) — PLAN.md 10's explicit "verify ... render
-  with a tool list" check passes for 3 of these 4 models (Phi-4-mini is
-  the exception — see Problem 1).
+- Granite 3.0/3.1/3.2, Llama-3.1, and (after the fix below) Phi-4-mini
+  all render a real tool list under F3 (directly verified by rendering
+  their templates with the same `tools=`/fallback input the harness
+  uses) — PLAN.md 10's explicit "verify ... render with a tool list"
+  check now passes for all 5 of these models. Phi-4-mini needed the fix
+  in Problem 1 to get there; it was the one exception found.
 
 ## Full results: one row per model × config
 
@@ -93,7 +94,7 @@ an optional extra "if smoke test fits 8GB"), every Q8_0 and Q2_K file
 | phi35_mini | D | True | True | 1.000 | bare_json:30 | 0.089 | 0 | 4999 | 1.11 |
 | phi35_mini | F4_generic_json | True | True | 1.000 | bare_json:30 | 0.089 | 0 | 5017 | 1.26 |
 | phi4_mini | D | True | True | 1.000 | bare_json:30 | 0.000 | 0 | 6484 | 0.96 |
-| phi4_mini | F3_native_tool_format | True | True | **0.000** | **(none)** | 0.156 | 0 | 6240 | 2.74 |
+| phi4_mini | F3_native_tool_format | True | True | 0.500 | list_wrapped:15 | 0.022 | 0 | 3522 | 0.73 |
 | phi4_mini | F4_generic_json | True | True | 1.000 | bare_json:30 | 0.000 | 0 | 6734 | 3.68 |
 | granite30 | D | True | True | 1.000 | bare_json:30 | 0.000 | 0 | 5809 | 0.84 |
 | granite30 | F3_native_tool_format | True | True | 0.933 | list_wrapped:28 | 0.000 | 0 | 5809 | 0.86 |
@@ -132,27 +133,41 @@ untagged. `parse_rate` is parse-success out of those same 30.
 
 ## Problems found
 
-**1. [HIGH] Phi-4-mini's native tool-calling path (F3) is completely
-non-functional: 0% parse rate, zero detected tool-call attempts of any
-kind, across all 30 baseline/schema_drift records.** Root-caused by
-directly rendering Phi-4-mini's own chat template with the exact `tools=`
-input the harness used: the rendered prompt is
+**1. [HIGH, FIXED 2026-10-05] Phi-4-mini's native tool-calling path (F3)
+was completely non-functional: 0% parse rate, zero detected tool-call
+attempts of any kind, across all 30 baseline/schema_drift records.**
+Root-caused by directly rendering Phi-4-mini's own chat template with
+the exact `tools=` input the harness used: the rendered prompt was
 `<|user|>What is the weather in Berlin?<|end|><|assistant|>` — **the tool
-list is completely absent**, not malformed. For comparison, the identical
-harness code correctly inlines the full function definition for Llama-3.1
-and Granite-3.1 (and, confirmed separately, for Granite-3.0/3.2 too — see
-their 93-100% parse rates above). The model is behaving sensibly given
-what it was actually shown: it answers in plain prose declining to help,
-since it has no idea a `get_weather` tool exists. Likely cause: Phi-4-mini's
-own chat_template checks for tool definitions attached to the per-message
-object (`'tools' in message`, per `feasibility.md`'s earlier read of its
-source `tokenizer_config.json`), not a separate top-level `tools=` kwarg —
-which is the convention this project's native-wrapping code (and
-llama-cpp-python's generic `Jinja2ChatFormatter`) uses for every model.
-D and F4 for Phi-4-mini are both 100% unaffected (they don't use `tools=`
-at all). **Not fixed — flagging for your decision**, since the fix would
-mean passing tool definitions differently for this one model family, a
-real code change outside today's three approved fixes.
+list was completely absent**, not malformed. Fetched Phi-4-mini's actual
+`chat_template` from its `tokenizer_config.json` directly: it only
+renders tool info when a `system`-role message has a `"tools"` field
+(and expects that field to already be a JSON *string*, since the
+template does raw string concatenation) — the top-level `tools=` kwarg
+this harness (and every other model's template here) uses is never
+referenced by Phi-4-mini's template at all. **Fix applied**:
+`LlamaCppClient.generate()` now renders normally first, checks
+(`missing_tool_names()`, new) whether every tool name actually appears
+in the rendered text, and if not, retries once with a `system` message
+carrying `{"tools": json.dumps(tools)}` before giving up with a clear
+error — this check now runs for every model in F3 mode, not just
+Phi-4-mini, so a template using some third convention will raise
+instead of silently dropping tools again. Verified against Phi-4-mini's
+real template text in `tests/test_native_tool_rendering.py` (reproduces
+the original bug, then proves the fallback fixes it).
+
+**Rerun result**: parse rate **0% → 50%** (15/30 detected as
+`list_wrapped`, 2.2% truncation, down from 15.6%). The remaining 50% is
+genuine model non-compliance, not a rendering problem — broken down by
+suite: **synthetic 10/10, BFCL-simple 5/10, BFCL-multiple 0/10.** The
+failures are Phi-4-mini explaining how to call the function in prose or
+a Python code snippet instead of emitting the requested JSON (e.g. "You
+can use the `math.gcd` function... ```python\nimport math\n..."), and it
+gets worse as the prompt becomes more BFCL-native/multi-tool — a real
+instruction-following limitation on this model's part, now that it
+actually sees the tools. D and F4 for Phi-4-mini remain 100% unaffected
+(they never use `tools=`). See
+`docs/ENGINEERING_NOTES.md` section 3 for the full writeup.
 
 **2. [MEDIUM] Qwen3's default "thinking" burns through the D protocol's
 256-token budget.** D and F3 both show markedly worse truncation (40%,
