@@ -213,10 +213,30 @@ nearly identically: "respond with `<|tool_call|>` followed by a JSON
 list") did not predict this difference. Worth knowing before treating all
 three Granite versions as using one shared parsing convention.
 
+**Decision: keep Granite-3.0's own format (no change).** Inspected both
+of its F3 parse failures (the 2/30 behind its 93.3% rate) directly.
+Both (`bfcl-multiple-multiple_0`, baseline and schema_drift) are the
+*same* defect: the model's JSON block has **no `"name"` key at all** —
+it only names the function in surrounding prose ("you can use the
+`triangle_properties.get` function with the following parameters")
+and the JSON itself is just the bare argument dict
+(`{"side1": 5, "side2": 4, "side3": 3, "get_area": true, ...}`), not a
+`{"name", "arguments"}`/`{"name", "parameters"}` envelope. This is not
+something `extract_tool_call_with_format` could recover without
+guessing a tool name out of free prose text at an arbitrary position —
+a heuristic this project's parser deliberately does not do (it would
+risk false positives on every other model's free-text explanations
+too, e.g. Phi-4-mini's prose in Problem 1's rerun also *names* functions
+in backticks while explaining them, without intending a real call).
+**Classification: (b) the model produced genuinely broken/incomplete
+output — not a parser bug.** No parser change made; no new test needed,
+since there is nothing to fix.
+
 **4. [LOW] A handful of model/config combinations have a small number of
 free-text parse misses, not a systemic or harness problem**: Mistral v0.2
 D (87%, 4/30 misses), Mistral v0.3 F3 (97%, 1 miss), Granite-3.0 F3 (93%,
-2 misses). Every other config is 100% except the two flagged above.
+2 misses — classified above). Every other config is 100% except the
+three flagged here.
 
 **5. [INFO] fault_reporting success varies widely across models (53%-100%,
 see table)** — expected, since this condition's exact scoring rule was
