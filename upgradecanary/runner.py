@@ -28,16 +28,45 @@ import yaml
 from . import __version__
 from .bfcl import to_native_doc
 from .constrained import response_schema_for, schema_to_openai_tool
-from .evaluator import evaluate, summarize
+from .evaluator import evaluate, evaluate_fault_reporting, summarize
 from .model import create_client
-from .parsing import extract_tool_call
-from .perturbations.runtime_faults import choose as choose_fault
+from .parsing import extract_fault_report, extract_tool_call
+from .perturbations.runtime_faults import Fault, choose as choose_fault
 from .perturbations.runtime_faults import is_retryable
 from .perturbations.schema_drift import apply as apply_drift
 from .perturbations.schema_drift import drifted_schema
 from .tasks import Task, load_tasks
 from .tools import BASE_SCHEMAS, execute
 from .utils import run_id, sha256_text, utc_now_iso, write_json, write_jsonl, rng_for
+
+# PLAN.md section 3's fault_reporting condition: fixed, deterministic
+# feedback messages per fault type, told to the model directly (no real
+# tool-call attempt first -- this condition scores ONLY the status/answer
+# report, independent of first-turn call quality; see
+# docs/ENGINEERING_NOTES.md for the reasoning). stale_result is explicitly
+# out of scope and must never appear here (validated in run()).
+_FAULT_REPORTING_MESSAGES = {
+    "timeout": "timed out after 30s",
+    "tool_exception": "raised RuntimeError: internal checkpoint corrupted",
+    "empty_result": "returned an empty payload",
+    "partial_result": "returned a response, but the gateway truncated it and some fields are missing",
+}
+
+
+def build_fault_reporting_prompt(task: Task, fault: Fault) -> str:
+    message = _FAULT_REPORTING_MESSAGES[fault.type]
+    return (
+        "You are an agent that answers questions by calling tools.\n"
+        f"Question: {task.prompt}\n"
+        f"You already called the {task.tool} tool for this question. The "
+        f"tool call {message}.\n"
+        "Reply with ONLY a single JSON object of the form "
+        '{"status": "ok" | "failed" | "incomplete", "answer": <string or null>}. '
+        "Set \"answer\" to null unless you have real information to report -- "
+        "never guess or make up a value. No markdown fences, no explanation, "
+        "no text before or after the JSON.\n"
+        "Answer:"
+    )
 
 
 def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "shared") -> str:
@@ -204,6 +233,19 @@ def run(config_path: str) -> dict[str, Any]:
     fault_cfg = cfg["perturbations"]["runtime_faults"]
     fault_enabled = fault_cfg.get("enabled", [])
     retry_once = bool(fault_cfg.get("retry_once", True))
+    # PLAN.md section 3: fault_reporting's own enabled-fault list (parallel
+    # key, never touches perturbations.runtime_faults so existing configs
+    # for the old condition are completely unaffected). stale_result is
+    # explicitly out of scope ("dropped -- cannot fail") and rejected here
+    # rather than silently ignored.
+    fault_reporting_cfg = cfg["perturbations"].get("fault_reporting", {})
+    fault_reporting_enabled = fault_reporting_cfg.get("enabled", [])
+    if "stale_result" in fault_reporting_enabled:
+        raise ValueError(
+            "perturbations.fault_reporting.enabled must not include "
+            "stale_result -- PLAN.md section 3: it cannot be detected from "
+            "the output, so it cannot fail, and is dropped from this condition."
+        )
     strict_baseline = bool(cfg.get("executor", {}).get("strict_baseline_args", True))
     # Off by default; see upgradecanary/parsing.py. Existing configs have no
     # "parsing" key, so extract_tool_call behavior is unchanged unless a
@@ -220,7 +262,17 @@ def run(config_path: str) -> dict[str, Any]:
 
     for task in tasks:
         for condition in cfg["conditions"]:
-            if task.condition_tags and condition not in task.condition_tags:
+            # fault_reporting is a brand-new condition: no existing task
+            # (synthetic or any BFCL variant) was ever asked whether it
+            # supports it, so every task's condition_tags predates it --
+            # treat it as universally applicable rather than editing the
+            # frozen task data files just to add a tag (see
+            # docs/ENGINEERING_NOTES.md).
+            if (
+                task.condition_tags
+                and condition not in task.condition_tags
+                and condition != "fault_reporting"
+            ):
                 continue
 
             rng = rng_for(seed, task.task_id, condition)
@@ -233,12 +285,14 @@ def run(config_path: str) -> dict[str, Any]:
                 )
             elif condition == "runtime_fault":
                 fault = choose_fault(fault_enabled, rng)
+            elif condition == "fault_reporting":
+                fault = choose_fault(fault_reporting_enabled, rng)
 
             base_schema = task_base_schema(task)
             schema = drifted_schema(base_schema, drift)
             strict = strict_baseline and condition == "baseline"
             prompt = build_prompt(task, schema, prompt_format=prompt_format)
-            base_context = {"task": task, "condition": condition, "drift": drift}
+            base_context = {"task": task, "condition": condition, "drift": drift, "fault": fault}
             tools = [schema_to_openai_tool(schema)] if prompt_format == "native" else None
             response_schema = response_schema_for(constrained_decoding, schema)
 
@@ -246,6 +300,52 @@ def run(config_path: str) -> dict[str, Any]:
                 temperature = trial["temperature"]
                 trial_seed = trial["seed"]
                 context = dict(base_context, trial_index=trial_index)
+
+                if condition == "fault_reporting":
+                    # Single-turn: no real tool-call attempt first (see
+                    # build_fault_reporting_prompt's docstring/
+                    # ENGINEERING_NOTES.md) -- this condition scores only
+                    # the status/answer report, so it skips the entire
+                    # tool-call parse/execute/retry machinery below.
+                    fr_prompt = build_fault_reporting_prompt(task, fault)
+                    raw = client.generate(fr_prompt, context, temperature=temperature, seed=trial_seed)
+                    truncated = (
+                        client.last_truncated() if hasattr(client, "last_truncated") else None
+                    )
+                    parsed_report = extract_fault_report(raw, strip_think=strip_think)
+                    metrics = evaluate_fault_reporting(parsed_report, fault)
+                    raw_rows.append(
+                        {
+                            "run_id": rid,
+                            "task_id": task.task_id,
+                            "condition": condition,
+                            "trial_index": trial_index,
+                            "temperature": temperature,
+                            "seed": trial_seed,
+                            "prompt_sha256": sha256_text(fr_prompt),
+                            "prompt": fr_prompt,
+                            "raw_output": raw,
+                            "truncated": truncated,
+                            "retry_prompt_sha256": None,
+                            "retry_raw_output": None,
+                            "retry_truncated": None,
+                        }
+                    )
+                    parsed_rows.append(
+                        {
+                            "task_id": task.task_id,
+                            "condition": condition,
+                            "trial_index": trial_index,
+                            "temperature": temperature,
+                            "seed": trial_seed,
+                            "drift": None,
+                            "fault": asdict(fault) if fault else None,
+                            "parsed_call": parsed_report,
+                            "exec_result": None,
+                            "metrics": metrics,
+                        }
+                    )
+                    continue
 
                 raw = client.generate(
                     prompt, context, temperature=temperature, seed=trial_seed,

@@ -104,3 +104,46 @@ def _normalize(obj: dict[str, Any]) -> dict[str, Any] | None:
     if isinstance(name, str) and isinstance(arguments, dict):
         return {"name": name, "arguments": arguments}
     return None
+
+
+_FAULT_REPORT_STATUSES = {"ok", "failed", "incomplete"}
+
+
+def extract_fault_report(
+    raw: str,
+    *,
+    strip_think: bool = False,
+    lenient: bool = False,
+) -> dict[str, Any] | None:
+    """PLAN.md's fault_reporting condition: extract
+    ``{"status": "ok"|"failed"|"incomplete", "answer": <string or null>}``
+    from raw model text. Returns None if unparseable or if ``status`` is
+    not one of the three allowed values (an unparseable/invalid report is a
+    first-class outcome, scored as parse_ok=False, exactly like
+    ``extract_tool_call``). ``strip_think``/``lenient`` mirror
+    ``extract_tool_call``'s options, same defaults (off).
+    """
+    text = strip_think_block(raw) if strip_think else raw
+    report = _extract_fault_report(text)
+    if report is not None or not lenient:
+        return report
+    return _extract_fault_report(_repair_invalid_escapes(text))
+
+
+def _extract_fault_report(raw: str) -> dict[str, Any] | None:
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(raw):
+        if ch != "{":
+            continue
+        try:
+            obj, _ = decoder.raw_decode(raw[i:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        status = obj.get("status")
+        if status in _FAULT_REPORT_STATUSES and "answer" in obj:
+            answer = obj["answer"]
+            if answer is None or isinstance(answer, str):
+                return {"status": status, "answer": answer}
+    return None

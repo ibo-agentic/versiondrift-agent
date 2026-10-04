@@ -51,6 +51,9 @@ class MockModelClient:
         condition = context.get("condition", "baseline")
         is_retry = context.get("is_retry", False)
 
+        if condition == "fault_reporting":
+            return self._fault_report(task, context.get("fault"))
+
         if task.task_id in self.broken_output_for and not is_retry:
             return "I am sorry, but I cannot complete that request right now."
 
@@ -75,6 +78,18 @@ class MockModelClient:
         # The mock provider never truncates; None = not applicable (see
         # model/base.py ModelClient.last_truncated).
         return None
+
+    def _fault_report(self, task: Any, fault: Any) -> str:
+        # Always "correct" by construction, like the mock's default
+        # baseline/schema_drift behavior -- status matches
+        # evaluator.expected_fault_report()'s own mapping, answer is
+        # always null (the mock never fabricates). task.task_id in
+        # self.broken_output_for still yields an unparseable response, so
+        # parse_ok=False stays testable here too.
+        if task.task_id in self.broken_output_for:
+            return "I am sorry, but I cannot complete that request right now."
+        status = "incomplete" if fault is not None and fault.type == "partial_result" else "failed"
+        return json.dumps({"status": status, "answer": None}, sort_keys=True)
 
     def _choose_call(self, task: Any, condition: str, drift: Any, is_retry: bool) -> dict[str, Any]:
         expected = task.expected_call
