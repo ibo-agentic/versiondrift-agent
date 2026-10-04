@@ -113,6 +113,25 @@ for a historical run is unchanged. 137/137 tests pass (123 prior + 14 new).
   grammar converter (`LlamaGrammar.from_json_schema`) actually supports
   `const` was not verified against a real call this session.
 
+**2026-10-05 — F3 prompt was silently missing the task-framing text
+"shared" (D) has.** Asked to confirm F3 (`prompt_format: native`) sends
+the same task instruction text as D, differing only in tool format.
+Checked `build_prompt()` directly: it did not match. "shared" sends
+`"You are an agent that answers questions by calling tools.\n"` plus
+the schema dump plus `"Question: {task.prompt}"`; "native" sent **only**
+the bare `task.prompt` — no role/task framing sentence, no `"Question:
+"` label. Fixed: both branches now build from one `_TASK_INTRO` constant,
+and native renders `f"{_TASK_INTRO}Question: {task.prompt}"` — the same
+task framing and question structure as shared, with only the
+legitimately tool-format-specific parts (the schema dump, the "reply
+with ONLY a JSON object" instruction, and the trailing `"Answer:"` cue —
+redundant under native wrapping, since the chat template's own
+`add_generation_prompt` already opens the assistant turn) omitted, since
+those are exactly what the model's own native tool template replaces.
+`tests/test_plan_factors.py`'s `test_build_prompt_native_is_just_the_bare_question`
+(which encoded the old, now-confirmed-wrong behavior) was replaced with
+`test_build_prompt_native_shares_task_framing_with_shared`.
+
 ## 3. BFCL "multiple" category
 
 New, fully separate functions in `bfcl.py` (`find_correct_function`,

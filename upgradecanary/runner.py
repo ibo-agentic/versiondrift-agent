@@ -95,15 +95,25 @@ def _strip_descriptions(obj: Any) -> Any:
     return obj
 
 
+_TASK_INTRO = "You are an agent that answers questions by calling tools.\n"
+
+
 def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "shared") -> str:
-    # PLAN.md F3: "native" sends only the bare question -- the model's own
-    # chat template renders the tool definitions from the tools= list
-    # passed separately to ModelClient.generate() (see run(), below). This
-    # requires chat_wrapping: native (validated in run()); the hand-built
-    # JSON-in-prompt instruction below is specific to "shared" and has no
-    # equivalent under a model's native tool template.
+    # PLAN.md F3: the model's own chat template renders the tool
+    # definitions from the tools= list passed separately to
+    # ModelClient.generate() (see run(), below); this requires
+    # chat_wrapping: native (validated in run()). Only the tool-FORMAT
+    # instruction (the schema dump + "reply with ONLY a JSON object"
+    # sentence just below) is specific to "shared" and has no equivalent
+    # under a model's native tool template -- the task framing and the
+    # question itself must still match "shared" exactly, via the same
+    # _TASK_INTRO constant and "Question: {task.prompt}" structure.
+    # 2026-10-05 fix: this used to return just the bare task.prompt,
+    # silently dropping the task-framing sentence "shared" has --
+    # confirmed via a direct side-by-side check and fixed; see
+    # ENGINEERING_NOTES.md.
     if prompt_format == "native":
-        return task.prompt
+        return f"{_TASK_INTRO}Question: {task.prompt}"
     if prompt_format not in ("shared", "no_description"):
         raise ValueError(f"prompt_format must be 'shared', 'native', or 'no_description', got {prompt_format!r}")
     # BFCL-derived tasks render the BFCL-native form of the PASSED schema, so
@@ -131,7 +141,7 @@ def build_prompt(task: Task, schema: dict[str, Any], prompt_format: str = "share
         tools = _strip_descriptions(tools)
     tool_json = json.dumps({"tools": tools}, indent=2, sort_keys=True)
     return (
-        "You are an agent that answers questions by calling tools.\n"
+        _TASK_INTRO +
         f"Available tool schema:\n{tool_json}\n"
         "Reply with ONLY a single JSON object of the form "
         '{"name": <tool name>, "arguments": {<args>}}. '

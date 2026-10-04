@@ -98,11 +98,24 @@ def test_build_prompt_shared_is_unchanged_default():
     assert prompt.endswith("Answer:")
 
 
-def test_build_prompt_native_is_just_the_bare_question():
+def test_build_prompt_native_shares_task_framing_with_shared():
+    # 2026-10-05 fix: native must carry the same task-framing sentence
+    # and "Question: ..." structure as "shared" -- only the tool-format
+    # instruction (schema dump + "reply with ONLY a JSON object") is
+    # legitimately native-specific, since the model's own chat template
+    # replaces that part. Confirmed via a direct side-by-side check this
+    # was NOT true before this fix (native used to be just the bare
+    # question, dropping the framing sentence entirely).
     task = _make_task()
-    prompt = build_prompt(task, WEATHER_SCHEMA, prompt_format="native")
-    assert prompt == task.prompt
-    assert "Available tool schema" not in prompt
+    shared_prompt = build_prompt(task, WEATHER_SCHEMA, prompt_format="shared")
+    native_prompt = build_prompt(task, WEATHER_SCHEMA, prompt_format="native")
+    assert "You are an agent that answers questions by calling tools." in shared_prompt
+    assert "You are an agent that answers questions by calling tools." in native_prompt
+    assert f"Question: {task.prompt}" in shared_prompt
+    assert f"Question: {task.prompt}" in native_prompt
+    # Only the tool-format-specific parts legitimately differ.
+    assert "Available tool schema" not in native_prompt
+    assert "Reply with ONLY a single JSON object" not in native_prompt
 
 
 def test_build_prompt_rejects_unknown_format():
