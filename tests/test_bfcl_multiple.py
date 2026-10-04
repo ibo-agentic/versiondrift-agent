@@ -5,11 +5,13 @@ inline BFCL-shaped fixtures, not dependent on the external/gorilla checkout
 
 from __future__ import annotations
 
+import json
+import random
+
 from upgradecanary.bfcl import convert_multiple, find_correct_function, is_eligible_multiple
 from upgradecanary.runner import build_prompt, task_base_schema
 from upgradecanary.tasks import load_tasks
 from upgradecanary.perturbations.schema_drift import apply as apply_drift, drifted_schema
-import random
 
 TRIANGLE_FN = {
     "name": "triangle_properties.get",
@@ -122,3 +124,46 @@ def test_drift_applies_only_to_correct_tool_distractor_renders_verbatim():
     circle_start = prompt.index('"circle_properties.get"')
     circle_block = prompt[circle_start:]
     assert "verbose" not in circle_block
+
+
+# --- generate_multiple() against the real external/gorilla checkout --------
+# Mirrors tests/test_pilot.py's test_bfcl_selection_deterministic pattern for
+# the original generate() (simple_python). Needs the real BFCL_v4_multiple.json
+# data (external/gorilla, gitignored) -- same assumption test_pilot.py already
+# makes for generate(), so no extra skip guard is added here either.
+
+from upgradecanary.bfcl import generate_multiple
+
+
+def test_generate_multiple_selects_100_and_is_deterministic(tmp_path):
+    stats = generate_multiple(tmp_path, max_prompt_chars=3500)
+    assert stats["selected"] == 100
+    assert stats["eligible"] >= 100
+    first = (tmp_path / "bfcl_multiple_tasks.jsonl").read_text(encoding="utf-8")
+    generate_multiple(tmp_path, max_prompt_chars=3500)  # regeneration must be byte-identical
+    assert (tmp_path / "bfcl_multiple_tasks.jsonl").read_text(encoding="utf-8") == first
+    ids = [json.loads(line)["task_id"] for line in first.splitlines()]
+    assert len(ids) == len(set(ids)) == 100
+
+
+def test_generate_multiple_default_budget_selects_zero(tmp_path):
+    # Documents the real blocker this follow-up found and resolved with the
+    # user (see commit 1448244 / ENGINEERING_NOTES.md): the default budget
+    # (1200, matching simple_python literally) is categorically too small
+    # for this category, by construction. Guards against a future change
+    # silently "fixing" this default without updating that documentation.
+    stats = generate_multiple(tmp_path)  # default max_prompt_chars=1200
+    assert stats["selected"] == 0
+    assert stats["eligible"] == 0
+
+
+def test_generate_multiple_every_selected_task_has_at_least_two_candidates(tmp_path):
+    stats = generate_multiple(tmp_path, max_prompt_chars=3500)
+    assert stats["selected"] == 100
+    tasks = load_tasks(tmp_path / "bfcl_multiple_tasks.jsonl")
+    assert len(tasks) == 100
+    for task in tasks:
+        assert task.suite == "bfcl"
+        assert task.candidate_schemas is not None and len(task.candidate_schemas) >= 2
+        names = {c["name"] for c in task.candidate_schemas}
+        assert task.tool in names  # the correct tool is always among its own candidates

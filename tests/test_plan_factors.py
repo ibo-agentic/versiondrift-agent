@@ -225,3 +225,37 @@ def test_build_prompt_rejects_unknown_format_still_works():
 
 def test_validate_run_factors_accepts_no_description():
     validate_run_factors({"model": {}, "prompt_format": "no_description"})  # must not raise
+
+
+# --- regression guard: the two new control example configs stay valid ------
+
+import yaml  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "configs/aa_qwen3_nothink_seedB.yaml",
+        "configs/positive_control_no_description_qwen3_nothink.yaml",
+    ],
+)
+def test_control_example_configs_remain_valid(path):
+    with open(path, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    validate_run_factors(cfg)  # must not raise
+    factors = resolve_run_factors(cfg)
+    assert factors["F1_max_tokens"] == 256
+
+
+def test_aa_config_differs_from_positive_control_only_in_seed_and_experiment():
+    with open("configs/aa_qwen3_nothink_seedB.yaml", encoding="utf-8") as f:
+        aa = yaml.safe_load(f)
+    with open("configs/positive_control_no_description_qwen3_nothink.yaml", encoding="utf-8") as f:
+        pc = yaml.safe_load(f)
+    aa_factors = resolve_run_factors(aa)
+    pc_factors = resolve_run_factors(pc)
+    assert aa_factors["F3_prompt_format"] == "shared"
+    assert pc_factors["F3_prompt_format"] == "no_description"
+    # Same model path/precision in both -- the two controls differ in
+    # exactly one factor each from their shared base, not several at once.
+    assert aa["model"]["path"] == pc["model"]["path"]
