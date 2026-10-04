@@ -121,26 +121,38 @@ budget()` raises a clear error (never silently truncates) if
 
 ## 4. `fault_reporting` condition
 
-New, additive condition. After an injected fault, the model gets ONE turn
+New, additive condition. After a tool result, the model gets ONE turn
 telling it the outcome and must reply `{"status": "ok"|"failed"|
 "incomplete", "answer": <string or null>}`. No real tool-call attempt is
 scored first — this condition tests reporting behavior only.
 
-**Judgment call, not something PLAN.md states explicitly — flagging for
-confirmation**: PLAN.md says "Success = correct status AND no fabricated
-answer when status should be `failed`" but does not specify which status
-is "correct" per fault type, nor exactly what counts as fabrication. I
-read `apply_fault()`'s actual implementation and found that none of the
-four fault types (`timeout`/`tool_exception`/`empty_result`/
-`partial_result`) ever surface a real data value — only an error message
-(`partial_result`'s `missing_keys` is metadata about what's absent, not a
-partial payload). From that, the simplest consistent rule:
-`timeout`/`tool_exception`/`empty_result` → expected status `"failed"`;
-`partial_result` → expected status `"incomplete"`; `answer` must be falsy
-in **every** case (there's never legitimate content to report). This is a
-reasonable reading, but it is my interpretation of an underspecified rule,
-not a direct quote from PLAN.md — worth explicit sign-off before treating
-`fault_reporting` results as final.
+**2026-10-04 — scoring rule replaced with the user's exact rule** (this
+batch's earlier interpretation, which treated `fault=None` as undefined
+and required `answer` falsy in every case, is superseded; see PLAN.md
+section 3 for the rule quoted in full). Key changes from that earlier
+interpretation:
+- `fault=None` (a normal, unperturbed tool result) is now a first-class
+  outcome with expected status `"ok"` — `choose_with_ok()` (new, in
+  `perturbations/runtime_faults.py`) includes it with the same per-task
+  probability as each enabled fault type, so clean cases are as common as
+  each fault type in expectation (same unstratified-random-per-task
+  pattern as every other perturbation choice in this project — see that
+  function's docstring for why exact-count stratification wasn't used).
+- The fabrication check (`answer` must be null/empty) now applies **only**
+  when `"failed"` is the expected status — not to `"ok"` or `"incomplete"`.
+  `expected_fault_report()` now returns a plain status string (was a
+  `(status, None)` tuple with a vestigial unused second element).
+- `build_fault_reporting_prompt()` now defines all three statuses
+  explicitly in the prompt text (`ok`/`failed`/`incomplete`), and has a
+  "succeeded and returned its normal result" message for the `fault=None`
+  case alongside the four fault messages.
+- `mock_llm._fault_report()` now calls `evaluator.expected_fault_report()`
+  directly (previously duplicated the status-mapping logic inline) so the
+  two can't drift apart.
+`tests/test_fault_reporting.py` rewritten for the new rule (ok-case
+success/failure, failed-case null-or-empty fabrication check, incomplete-
+case fabrication-not-checked, `choose_with_ok` balance/determinism). 149
+tests pass (137 prior + 12 net new).
 
 Also: no existing task's `condition_tags` ever included `"fault_reporting"`
 (it didn't exist when they were generated). Rather than edit any frozen
@@ -212,9 +224,9 @@ test's pattern), including a regression guard pinning down the documented
    rate specifically at smoke-test time.
 4. **F4 `full_schema`'s use of JSON Schema `const`** is unverified against
    llama.cpp's grammar converter.
-5. **`fault_reporting`'s status-mapping and fabrication rule are my
-   interpretation** of an underspecified PLAN.md sentence, not a direct
-   quote — flagging for explicit confirmation.
+5. **Resolved 2026-10-04**: `fault_reporting`'s status-mapping and
+   fabrication rule now follow the user's exact rule (PLAN.md section 3),
+   replacing this batch's earlier interpretation.
 6. **Sampling presets: only 4 of 14 models have a (session-unverified)
    recommended value**; the other 10 are UNVERIFIED, not invented.
 7. **A/A (6×3) and positive-control (4 models) matrices are not

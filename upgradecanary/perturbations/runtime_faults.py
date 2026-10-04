@@ -32,6 +32,24 @@ def choose(enabled: list[str], rng: random.Random) -> Fault | None:
     return Fault(type=rng.choice(sorted(enabled)))
 
 
+def choose_with_ok(enabled: list[str], rng: random.Random) -> Fault | None:
+    """Like ``choose``, but for the ``fault_reporting`` condition only: also
+    includes a "normal result" (``None``) outcome, picked with the same
+    per-task probability as each individual fault type (1/(n+1) each).
+    Required so a model that always answers "failed" cannot score well --
+    there must be clean cases where the correct status is "ok" too
+    (PLAN.md section 3, 2026-10-04 fault_reporting scoring fix). Balance is
+    in expectation across many tasks, same as every other per-task
+    perturbation choice in this project (``choose``, ``schema_drift.apply``)
+    -- none of them stratify to an exact count, and this does not either.
+    """
+    if not enabled:
+        return None
+    options: list[str | None] = [None, *sorted(enabled)]
+    choice = rng.choice(options)
+    return None if choice is None else Fault(type=choice)
+
+
 def is_retryable(fault: Fault | None) -> bool:
     return fault is not None and fault.type in RETRYABLE
 

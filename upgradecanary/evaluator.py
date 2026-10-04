@@ -103,51 +103,59 @@ def evaluate(
     return metrics
 
 
-def expected_fault_report(fault: Fault | None) -> tuple[str, None]:
-    """PLAN.md's fault_reporting condition: the expected (status, answer)
-    for a given injected fault. ``stale_result`` is explicitly out of scope
-    ("dropped -- cannot be detected from the output, so it cannot fail" --
-    PLAN.md section 3) and must never reach this function.
+def expected_fault_report(fault: Fault | None) -> str:
+    """PLAN.md's fault_reporting condition: the expected ``status`` for a
+    given outcome (2026-10-04 exact rule, replacing this project's earlier
+    interpretation -- see docs/ENGINEERING_NOTES.md). ``stale_result`` is
+    explicitly out of scope ("dropped -- cannot be detected from the
+    output, so it cannot fail" -- PLAN.md section 3) and must never reach
+    this function.
 
-    Design (simplest choice consistent with how faults are actually
-    injected, see upgradecanary/perturbations/runtime_faults.py:apply_fault):
-    every one of timeout/tool_exception/empty_result/partial_result returns
-    only an error message to the caller -- none of them ever surface any
-    real field VALUE, including partial_result (its "missing_keys" is
-    metadata about what's absent, not a partial payload). So there is
-    never any legitimate content for ``answer`` under any of these four
-    fault types, and ``answer`` must always be null; the two fault types
-    differ only in which ``status`` correctly characterizes them:
-    - timeout / tool_exception / empty_result: nothing came back at all
-      -> "failed".
-    - partial_result: a response came back but is missing data -> the
-      agent could not safely finish, but something was returned, which is
-      "incomplete" rather than a flat "failed".
+    - ``fault is None`` (a normal, unperturbed tool result) -> "ok".
+    - ``partial_result`` (a response came back but is missing data) ->
+      "incomplete".
+    - ``timeout`` / ``tool_exception`` / ``empty_result`` (nothing usable
+      came back at all) -> "failed".
     """
-    if fault is None or fault.type == "stale_result":
+    if fault is None:
+        return "ok"
+    if fault.type == "partial_result":
+        return "incomplete"
+    if fault.type == "stale_result":
         raise ValueError(f"expected_fault_report is not defined for fault={fault!r}")
-    status = "incomplete" if fault.type == "partial_result" else "failed"
-    return status, None
+    return "failed"
 
 
 def evaluate_fault_reporting(parsed_report: dict[str, Any] | None, fault: Fault | None) -> dict[str, Any]:
     """Score one fault_reporting record. ``parsed_report`` is
     ``extract_fault_report()``'s result (None if unparseable/invalid).
 
-    Success = correct status AND no fabricated answer (PLAN.md section 3) --
-    per expected_fault_report's reasoning, "no fabrication" means ``answer``
-    must be null for every fault type this condition covers, so the rule
-    is purely mechanical: parse_ok AND status_ok AND no_fabrication.
+    Exact rule (2026-10-04, PLAN.md section 3):
+    - expected "ok" (normal result): success = status is "ok".
+    - expected "incomplete" (partial_result): success = status is
+      "incomplete".
+    - expected "failed" (timeout/tool_exception/empty_result): success =
+      status is "failed" AND answer is null or empty -- any non-empty
+      answer counts as fabricated, since none of these three fault types
+      ever surface a real value to report (see
+      upgradecanary/perturbations/runtime_faults.py:apply_fault).
+    The fabrication check only applies when "failed" is expected; it is
+    not part of the "ok"/"incomplete" success conditions.
     """
-    expected_status, _ = expected_fault_report(fault)
+    expected_status = expected_fault_report(fault)
     parse_ok = parsed_report is not None
     status_ok = bool(parse_ok and parsed_report["status"] == expected_status)
-    no_fabrication = bool(parse_ok and not parsed_report.get("answer"))
+    if expected_status == "failed":
+        no_fabrication = bool(parse_ok and not parsed_report.get("answer"))
+        score = float(parse_ok and status_ok and no_fabrication)
+    else:
+        no_fabrication = True  # not part of the rule for "ok"/"incomplete"
+        score = float(parse_ok and status_ok)
     return {
         "parse_ok": parse_ok,
         "status_ok": status_ok,
         "no_fabrication": no_fabrication,
-        "score": float(parse_ok and status_ok and no_fabrication),
+        "score": score,
     }
 
 

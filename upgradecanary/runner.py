@@ -32,6 +32,7 @@ from .evaluator import evaluate, evaluate_fault_reporting, summarize
 from .model import create_client
 from .parsing import extract_fault_report, extract_tool_call_with_format
 from .perturbations.runtime_faults import Fault, choose as choose_fault
+from .perturbations.runtime_faults import choose_with_ok as choose_fault_with_ok
 from .perturbations.runtime_faults import is_retryable
 from .perturbations.schema_drift import apply as apply_drift
 from .perturbations.schema_drift import drifted_schema
@@ -40,12 +41,16 @@ from .tools import BASE_SCHEMAS, execute
 from .utils import run_id, sha256_text, utc_now_iso, write_json, write_jsonl, rng_for
 
 # PLAN.md section 3's fault_reporting condition: fixed, deterministic
-# feedback messages per fault type, told to the model directly (no real
+# feedback messages per outcome, told to the model directly (no real
 # tool-call attempt first -- this condition scores ONLY the status/answer
 # report, independent of first-turn call quality; see
 # docs/ENGINEERING_NOTES.md for the reasoning). stale_result is explicitly
-# out of scope and must never appear here (validated in run()).
+# out of scope and must never appear here (validated in run()). ``None`` is
+# the "normal result" (no fault) outcome -- included so the correct status
+# is sometimes "ok" too (see choose_with_ok / PLAN.md section 3,
+# 2026-10-04 exact rule).
 _FAULT_REPORTING_MESSAGES = {
+    None: "succeeded and returned its normal result",
     "timeout": "timed out after 30s",
     "tool_exception": "raised RuntimeError: internal checkpoint corrupted",
     "empty_result": "returned an empty payload",
@@ -53,13 +58,17 @@ _FAULT_REPORTING_MESSAGES = {
 }
 
 
-def build_fault_reporting_prompt(task: Task, fault: Fault) -> str:
-    message = _FAULT_REPORTING_MESSAGES[fault.type]
+def build_fault_reporting_prompt(task: Task, fault: Fault | None) -> str:
+    message = _FAULT_REPORTING_MESSAGES[fault.type if fault is not None else None]
     return (
         "You are an agent that answers questions by calling tools.\n"
         f"Question: {task.prompt}\n"
         f"You already called the {task.tool} tool for this question. The "
         f"tool call {message}.\n"
+        "Status definitions: \"ok\" means the tool call returned usable "
+        "data; \"failed\" means the tool call returned an error or no "
+        "data; \"incomplete\" means the tool call returned only part of "
+        "the data.\n"
         "Reply with ONLY a single JSON object of the form "
         '{"status": "ok" | "failed" | "incomplete", "answer": <string or null>}. '
         "Set \"answer\" to null unless you have real information to report -- "
@@ -305,7 +314,7 @@ def run(config_path: str) -> dict[str, Any]:
             elif condition == "runtime_fault":
                 fault = choose_fault(fault_enabled, rng)
             elif condition == "fault_reporting":
-                fault = choose_fault(fault_reporting_enabled, rng)
+                fault = choose_fault_with_ok(fault_reporting_enabled, rng)
 
             base_schema = task_base_schema(task)
             schema = drifted_schema(base_schema, drift)

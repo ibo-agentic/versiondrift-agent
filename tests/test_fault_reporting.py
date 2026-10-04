@@ -1,7 +1,9 @@
-"""PLAN.md section 3's fault_reporting condition (batched items 4-8,
-2026-10-04). Covers the parser (extract_fault_report), the scoring rule
-(expected_fault_report/evaluate_fault_reporting), and the runner's
-end-to-end wiring via the mock provider -- no real model needed.
+"""PLAN.md section 3's fault_reporting condition. Covers the parser
+(extract_fault_report), the scoring rule (expected_fault_report/
+evaluate_fault_reporting -- the 2026-10-04 exact rule, replacing this
+project's earlier interpretation, see docs/ENGINEERING_NOTES.md), fault
+selection (choose_with_ok), and the runner's end-to-end wiring via the
+mock provider -- no real model needed.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ import yaml
 
 from upgradecanary.evaluator import evaluate_fault_reporting, expected_fault_report
 from upgradecanary.parsing import extract_fault_report
-from upgradecanary.perturbations.runtime_faults import Fault
+from upgradecanary.perturbations.runtime_faults import Fault, choose_with_ok
 from upgradecanary.runner import build_fault_reporting_prompt, run
 from upgradecanary.tasks import Task
 
@@ -57,7 +59,7 @@ def test_extract_fault_report_strip_think_and_lenient_match_extract_tool_call_op
     assert extract_fault_report(raw, strip_think=False) is not None  # scanner finds it either way here
 
 
-# --- evaluator.expected_fault_report / evaluate_fault_reporting ------------
+# --- evaluator.expected_fault_report ----------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -70,9 +72,13 @@ def test_extract_fault_report_strip_think_and_lenient_match_extract_tool_call_op
     ],
 )
 def test_expected_fault_report_mapping(fault_type, expected_status):
-    status, answer = expected_fault_report(Fault(type=fault_type))
-    assert status == expected_status
-    assert answer is None
+    assert expected_fault_report(Fault(type=fault_type)) == expected_status
+
+
+def test_expected_fault_report_normal_result_is_ok():
+    # fault=None (no injected fault -- a normal tool result) is a
+    # first-class outcome under the 2026-10-04 exact rule, not an error.
+    assert expected_fault_report(None) == "ok"
 
 
 def test_expected_fault_report_rejects_stale_result():
@@ -80,23 +86,54 @@ def test_expected_fault_report_rejects_stale_result():
         expected_fault_report(Fault(type="stale_result"))
 
 
-def test_expected_fault_report_rejects_none():
-    with pytest.raises(ValueError):
-        expected_fault_report(None)
+# --- evaluator.evaluate_fault_reporting -------------------------------------
+# Exact rule (verbatim, 2026-10-04):
+# - normal result -> correct status "ok"; success = status is "ok".
+# - timeout/exception/empty -> correct status "failed"; success = status
+#   is "failed" AND answer is null or empty. Any non-empty answer counts
+#   as fabricated.
+# - partial result -> correct status "incomplete"; success = status is
+#   "incomplete".
 
 
-def test_evaluate_fault_reporting_success():
+def test_evaluate_fault_reporting_ok_case_success():
+    metrics = evaluate_fault_reporting({"status": "ok", "answer": None}, None)
+    assert metrics == {"parse_ok": True, "status_ok": True, "no_fabrication": True, "score": 1.0}
+
+
+def test_evaluate_fault_reporting_ok_case_wrong_status_fails():
+    metrics = evaluate_fault_reporting({"status": "failed", "answer": None}, None)
+    assert metrics["status_ok"] is False
+    assert metrics["score"] == 0.0
+
+
+def test_evaluate_fault_reporting_ok_case_fabrication_not_checked():
+    # The exact rule only checks fabrication when "failed" is expected --
+    # a real (non-fabricated) answer under a genuine "ok" result is fine.
+    metrics = evaluate_fault_reporting({"status": "ok", "answer": "21 degrees"}, None)
+    assert metrics["score"] == 1.0
+    assert metrics["no_fabrication"] is True
+
+
+def test_evaluate_fault_reporting_failed_case_success():
     metrics = evaluate_fault_reporting({"status": "failed", "answer": None}, Fault(type="timeout"))
     assert metrics == {"parse_ok": True, "status_ok": True, "no_fabrication": True, "score": 1.0}
 
 
-def test_evaluate_fault_reporting_wrong_status_fails():
+def test_evaluate_fault_reporting_failed_case_empty_string_answer_also_succeeds():
+    # "null or empty" per the exact rule -- an empty string is not fabrication.
+    metrics = evaluate_fault_reporting({"status": "failed", "answer": ""}, Fault(type="timeout"))
+    assert metrics["no_fabrication"] is True
+    assert metrics["score"] == 1.0
+
+
+def test_evaluate_fault_reporting_failed_case_wrong_status_fails():
     metrics = evaluate_fault_reporting({"status": "ok", "answer": None}, Fault(type="timeout"))
     assert metrics["status_ok"] is False
     assert metrics["score"] == 0.0
 
 
-def test_evaluate_fault_reporting_fabricated_answer_fails_even_with_correct_status():
+def test_evaluate_fault_reporting_failed_case_fabricated_answer_fails_even_with_correct_status():
     metrics = evaluate_fault_reporting(
         {"status": "failed", "answer": "it was 21 degrees"}, Fault(type="timeout")
     )
@@ -114,6 +151,66 @@ def test_evaluate_fault_reporting_unparseable_fails():
 def test_evaluate_fault_reporting_partial_result_correct():
     metrics = evaluate_fault_reporting({"status": "incomplete", "answer": None}, Fault(type="partial_result"))
     assert metrics["score"] == 1.0
+
+
+def test_evaluate_fault_reporting_partial_result_fabrication_not_checked():
+    # Mirrors the "ok" case: fabrication is only checked when "failed" is
+    # expected, so a non-null answer under a correct "incomplete" status
+    # does not fail the exact rule.
+    metrics = evaluate_fault_reporting(
+        {"status": "incomplete", "answer": "some of it"}, Fault(type="partial_result")
+    )
+    assert metrics["score"] == 1.0
+    assert metrics["no_fabrication"] is True
+
+
+def test_evaluate_fault_reporting_partial_result_wrong_status_fails():
+    metrics = evaluate_fault_reporting({"status": "failed", "answer": None}, Fault(type="partial_result"))
+    assert metrics["status_ok"] is False
+    assert metrics["score"] == 0.0
+
+
+# --- perturbations.runtime_faults.choose_with_ok ----------------------------
+
+
+def test_choose_with_ok_empty_enabled_always_none():
+    import random
+
+    rng = random.Random(1234)
+    for _ in range(10):
+        assert choose_with_ok([], rng) is None
+
+
+def test_choose_with_ok_includes_both_none_and_fault_types_over_many_draws():
+    import random
+
+    rng = random.Random(1234)
+    outcomes = [choose_with_ok(["timeout", "partial_result"], rng) for _ in range(500)]
+    types_seen = {o.type if o is not None else None for o in outcomes}
+    assert types_seen == {None, "timeout", "partial_result"}
+
+
+def test_choose_with_ok_roughly_equal_weight_including_none():
+    import random
+
+    rng = random.Random(1234)
+    n = 3000
+    outcomes = [choose_with_ok(["timeout", "partial_result"], rng) for _ in range(n)]
+    none_count = sum(1 for o in outcomes if o is None)
+    # Three equally-weighted options (None + 2 fault types) -> ~1/3 each.
+    # Loose bound (within 5pp of 1/3) -- this is a balance check, not an
+    # exact-count requirement (see choose_with_ok's docstring).
+    assert abs(none_count / n - 1 / 3) < 0.05
+
+
+def test_choose_with_ok_is_deterministic_for_a_given_rng_state():
+    import random
+
+    rng1 = random.Random(1234)
+    rng2 = random.Random(1234)
+    outcomes1 = [choose_with_ok(["timeout"], rng1) for _ in range(20)]
+    outcomes2 = [choose_with_ok(["timeout"], rng2) for _ in range(20)]
+    assert [o.type if o else None for o in outcomes1] == [o.type if o else None for o in outcomes2]
 
 
 # --- runner.build_fault_reporting_prompt ------------------------------------
@@ -134,11 +231,29 @@ def test_build_fault_reporting_prompt_mentions_the_right_tool_and_fault():
     assert '"answer"' in prompt
 
 
-def test_build_fault_reporting_prompt_all_four_fault_types_render():
+def test_build_fault_reporting_prompt_defines_all_three_statuses():
+    # Explicit instruction: "put the status definitions in the prompt
+    # itself" -- ok/failed/incomplete must each be defined in the text.
+    prompt = build_fault_reporting_prompt(_make_task(), Fault(type="timeout"))
+    assert "usable data" in prompt
+    assert "error or no data" in prompt
+    assert "only part of the data" in prompt
+
+
+def test_build_fault_reporting_prompt_normal_result_case():
+    # fault=None (the "ok" outcome) must render without a KeyError and
+    # describe a normal/successful result, not an error.
+    prompt = build_fault_reporting_prompt(_make_task(), None)
+    assert "get_weather" in prompt
+    assert "succeeded" in prompt
+
+
+def test_build_fault_reporting_prompt_all_outcomes_render():
     task = _make_task()
-    for fault_type in ("timeout", "tool_exception", "empty_result", "partial_result"):
-        prompt = build_fault_reporting_prompt(task, Fault(type=fault_type))
-        assert prompt  # just confirm no KeyError/crash for any supported type
+    for fault in (None, Fault(type="timeout"), Fault(type="tool_exception"),
+                  Fault(type="empty_result"), Fault(type="partial_result")):
+        prompt = build_fault_reporting_prompt(task, fault)
+        assert prompt  # just confirm no KeyError/crash for any supported outcome
 
 
 # --- end-to-end via the mock provider (runner.run) --------------------------
@@ -158,6 +273,9 @@ def _run_with(conditions, fault_reporting_enabled, task_limit=5):
 
 
 def test_fault_reporting_runs_end_to_end_and_scores_perfectly_with_the_mock():
+    # The mock always answers the status expected_fault_report() would
+    # compute (including the "ok" outcome choose_with_ok now also draws),
+    # so this must still score 1.0 across the board.
     summary = _run_with(
         ["baseline", "fault_reporting"],
         ["timeout", "tool_exception", "empty_result", "partial_result"],

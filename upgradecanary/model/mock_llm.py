@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..evaluator import expected_fault_report
 from ..perturbations.schema_drift import to_stale_args
 
 _THOUGHTS = {
@@ -82,13 +83,14 @@ class MockModelClient:
     def _fault_report(self, task: Any, fault: Any) -> str:
         # Always "correct" by construction, like the mock's default
         # baseline/schema_drift behavior -- status matches
-        # evaluator.expected_fault_report()'s own mapping, answer is
-        # always null (the mock never fabricates). task.task_id in
-        # self.broken_output_for still yields an unparseable response, so
-        # parse_ok=False stays testable here too.
+        # evaluator.expected_fault_report()'s own mapping (including the
+        # fault=None "ok"/normal-result case), answer is always null (the
+        # mock never fabricates). task.task_id in self.broken_output_for
+        # still yields an unparseable response, so parse_ok=False stays
+        # testable here too.
         if task.task_id in self.broken_output_for:
             return "I am sorry, but I cannot complete that request right now."
-        status = "incomplete" if fault is not None and fault.type == "partial_result" else "failed"
+        status = expected_fault_report(fault)
         return json.dumps({"status": status, "answer": None}, sort_keys=True)
 
     def _choose_call(self, task: Any, condition: str, drift: Any, is_retry: bool) -> dict[str, Any]:
