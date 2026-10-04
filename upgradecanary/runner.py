@@ -30,7 +30,7 @@ from .bfcl import to_native_doc
 from .constrained import response_schema_for, schema_to_openai_tool
 from .evaluator import evaluate, evaluate_fault_reporting, summarize
 from .model import create_client
-from .parsing import extract_fault_report, extract_tool_call
+from .parsing import extract_fault_report, extract_tool_call_with_format
 from .perturbations.runtime_faults import Fault, choose as choose_fault
 from .perturbations.runtime_faults import is_retryable
 from .perturbations.schema_drift import apply as apply_drift
@@ -373,7 +373,7 @@ def run(config_path: str) -> dict[str, Any]:
                 truncated = (
                     client.last_truncated() if hasattr(client, "last_truncated") else None
                 )
-                parsed = extract_tool_call(raw, strip_think=strip_think)
+                parsed, detected_format = extract_tool_call_with_format(raw, strip_think=strip_think)
                 exec_result = _safe_execute(
                     parsed, schema, drift, fault, strict, canonical_schema=base_schema
                 )
@@ -382,6 +382,7 @@ def run(config_path: str) -> dict[str, Any]:
                 retry_prompt = None
                 retry_raw = None
                 retry_truncated = None
+                retry_detected_format = None
                 if (
                     condition == "runtime_fault"
                     and is_retryable(fault)
@@ -406,7 +407,9 @@ def run(config_path: str) -> dict[str, Any]:
                     retry_truncated = (
                         client.last_truncated() if hasattr(client, "last_truncated") else None
                     )
-                    retry_parsed = extract_tool_call(retry_raw, strip_think=strip_think)
+                    retry_parsed, retry_detected_format = extract_tool_call_with_format(
+                        retry_raw, strip_think=strip_think
+                    )
                     retry_exec = _safe_execute(
                         retry_parsed, schema, drift, None, strict,
                         canonical_schema=base_schema,
@@ -449,6 +452,7 @@ def run(config_path: str) -> dict[str, Any]:
                         "retry_prompt_sha256": sha256_text(retry_prompt) if retry_prompt else None,
                         "retry_raw_output": retry_raw,
                         "retry_truncated": retry_truncated,
+                        "retry_detected_format": retry_detected_format if retry_raw else None,
                     }
                 )
                 # No run_id/timestamps here: parsed_results.jsonl must stay
@@ -464,6 +468,7 @@ def run(config_path: str) -> dict[str, Any]:
                         "drift": asdict(drift) if drift else None,
                         "fault": asdict(fault) if fault else None,
                         "parsed_call": parsed,
+                        "detected_format": detected_format,
                         "exec_result": exec_result,
                         "metrics": metrics,
                     }

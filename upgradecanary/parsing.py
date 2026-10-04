@@ -66,44 +66,118 @@ def extract_tool_call(
 
     ``strip_think``/``lenient`` default to False, matching the original,
     unconditional behavior used by every result in this project to date.
+    See ``extract_tool_call_with_format`` for the native-tool-call-format
+    detection/logging variant (PLAN.md F3 follow-up, 2026-10-04); this
+    function is a thin wrapper that discards the format label.
     """
-    text = strip_think_block(raw) if strip_think else raw
-    call = _extract(text)
-    if call is not None or not lenient:
-        return call
-    return _extract(_repair_invalid_escapes(text))
+    call, _format_name = extract_tool_call_with_format(raw, strip_think=strip_think, lenient=lenient)
+    return call
 
 
-def _extract(raw: str) -> dict[str, Any] | None:
-    for candidate in _json_candidates(raw):
-        call = _normalize(candidate)
-        if call is not None:
-            return call
+# PLAN.md F3 follow-up (2026-10-04): native tool-calling output formats,
+# verified against each model family's own tokenizer_config.json/chat
+# template rather than assumed -- see docs/ENGINEERING_NOTES.md for the
+# source quoted per format. Order matters: more specific tag checks run
+# before the generic untagged scan, and the paired Phi-4-mini tag is
+# checked before the prefix-only Granite tag (they share the same opening
+# literal, "<|tool_call|>").
+_QWEN_TAG_RE = re.compile(r"<tool_call>")
+_MISTRAL_TAG_RE = re.compile(r"\[TOOL_CALLS\]")
+_PHI4_PAIRED_TAG_RE = re.compile(r"<\|tool_call\|>.*?<\|/tool_call\|>", re.DOTALL)
+_GRANITE_TAG_RE = re.compile(r"<\|tool_call\|>")
+
+
+def _detect_native_format(raw: str) -> str | None:
+    """Which documented native tool-call tag (if any) is present in the raw
+    text. Purely a label for logging/diagnostics -- extraction itself scans
+    the whole text regardless of tags (see _call_candidates), since the
+    tag's surrounding text is simply ignored by the object/array scanner.
+    Returns None when no recognized tag is present (plain untagged JSON,
+    or an unparseable/unrelated response)."""
+    if _QWEN_TAG_RE.search(raw):
+        return "qwen_tool_call_tag"
+    if _MISTRAL_TAG_RE.search(raw):
+        return "mistral_tool_calls_tag"
+    if _PHI4_PAIRED_TAG_RE.search(raw):
+        return "phi4_tool_call_tag"
+    if _GRANITE_TAG_RE.search(raw):
+        return "granite_tool_call_tag"
     return None
 
 
-def _json_candidates(raw: str):
-    """Yield every top-level JSON object found in the text, left to right."""
+def extract_tool_call_with_format(
+    raw: str,
+    *,
+    strip_think: bool = False,
+    lenient: bool = False,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Like ``extract_tool_call``, but also returns which format was
+    detected: one of the four tagged native formats
+    (``"qwen_tool_call_tag"``, ``"mistral_tool_calls_tag"``,
+    ``"phi4_tool_call_tag"``, ``"granite_tool_call_tag"``), ``"list_wrapped"``
+    (a top-level JSON array, untagged), ``"parameters_alias"`` (a bare
+    object using ``"parameters"`` instead of ``"arguments"``, Llama 3.1
+    style), ``"bare_json"`` (the original ``{"name","arguments"}``/
+    ``{"tool_call": {...}}`` shape this project always supported), or
+    ``None`` (nothing parseable found, regardless of whether a tag was
+    detected -- a detected tag with unparseable content inside it is still
+    reported, since that's diagnostically useful, but the call is None).
+    """
+    text = strip_think_block(raw) if strip_think else raw
+    detected_tag = _detect_native_format(text)
+    call, shape = _extract_with_shape(text)
+    if call is None and lenient:
+        call, shape = _extract_with_shape(_repair_invalid_escapes(text))
+    if call is None:
+        return None, detected_tag
+    return call, detected_tag or shape
+
+
+def _extract_with_shape(raw: str) -> tuple[dict[str, Any] | None, str | None]:
+    for candidate, base_shape in _call_candidates(raw):
+        call, used_parameters_alias = _normalize(candidate)
+        if call is not None:
+            shape = "parameters_alias" if used_parameters_alias else base_shape
+            return call, shape
+    return None, None
+
+
+def _call_candidates(raw: str):
+    """Yield every top-level JSON object OR array found in the text, left
+    to right, tagged with a base shape label ("bare_json" for an object,
+    "list_wrapped" for an array -- the caller may override this with a
+    more specific tag label, or with "parameters_alias", once it knows
+    which key/tag actually matched)."""
     decoder = json.JSONDecoder()
     for i, ch in enumerate(raw):
-        if ch != "{":
+        if ch not in "{[":
             continue
         try:
             obj, _ = decoder.raw_decode(raw[i:])
         except json.JSONDecodeError:
             continue
         if isinstance(obj, dict):
-            yield obj
+            yield obj, "bare_json"
+        elif isinstance(obj, list) and obj and isinstance(obj[0], dict):
+            # A list-wrapped call (Mistral [TOOL_CALLS], Granite <|tool_call|>,
+            # or an untagged list) -- only the first element is used; this
+            # project's harness never asks for more than one call per turn.
+            yield obj[0], "list_wrapped"
 
 
-def _normalize(obj: dict[str, Any]) -> dict[str, Any] | None:
+def _normalize(obj: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
+    """Returns (call, used_parameters_alias)."""
     if "tool_call" in obj and isinstance(obj["tool_call"], dict):
         return _normalize(obj["tool_call"])
     name = obj.get("name")
     arguments = obj.get("arguments")
     if isinstance(name, str) and isinstance(arguments, dict):
-        return {"name": name, "arguments": arguments}
-    return None
+        return {"name": name, "arguments": arguments}, False
+    # Llama 3.1 style: "parameters" instead of "arguments".
+    parameters = obj.get("parameters")
+    if isinstance(name, str) and isinstance(parameters, dict):
+        return {"name": name, "arguments": parameters}, True
+    return None, False
 
 
 _FAULT_REPORT_STATUSES = {"ok", "failed", "incomplete"}

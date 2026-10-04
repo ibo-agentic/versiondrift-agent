@@ -60,16 +60,39 @@ project's internal schema via `upgradecanary/constrained.py`'s
 their public model cards (**not re-verified this session**); the other 10
 are explicitly marked UNVERIFIED, not given invented numbers.
 
-**Unclear / unverified:**
-- `extract_tool_call()`'s parser only recognizes `{"name", "arguments"}`
-  (or a `{"tool_call": {...}}` envelope). Some models' native tool-calling
-  conventions use `"parameters"` instead of `"arguments"` (e.g. Meta's
-  Llama-3.1 `<|python_tag|>` format, per `AUDIT.md`/`feasibility.md`). The
-  parser was **not** extended to accept `"parameters"` as a synonym,
-  because doing so without a real model's actual output to check against
-  would be guessing at a fix for an unconfirmed problem. If F3 native mode
-  shows suspiciously high `parse_failure` rates for a specific model at
-  smoke-test time, this is the first thing to check.
+**2026-10-04 follow-up — native format support added.** `parsing.py` now
+has `extract_tool_call_with_format()`, which accepts every documented
+native tool-call shape and labels which one matched: `"parameters"` as an
+alias for `"arguments"` (Llama 3.1's `<|python_tag|>` style, confirmed via
+`feasibility.md`'s earlier check against `unsloth/Meta-Llama-3.1-8B-
+Instruct`'s `tokenizer_config.json`), an untagged top-level JSON list
+(`"list_wrapped"`), and four tag-wrapped conventions verified this session
+against each model's own `tokenizer_config.json`/chat template: Qwen's
+paired `<tool_call>...</tool_call>` (Qwen2.5-7B-Instruct), Mistral v0.3's
+`[TOOL_CALLS]` prefix + JSON list (confirmed as special token id 5),
+Granite 3.1's `<|tool_call|>` prefix (no closing tag) + JSON list (quoted
+verbatim from its chat_template), and Phi-4-mini's paired
+`<|tool_call|>...<|/tool_call|>` form. **Phi-4-mini's is explicitly
+UNVERIFIED**: its tokenizer_config.json confirms both tokens exist, but no
+official example of the tool-call *output* (as opposed to how input tool
+definitions are wrapped) could be found — flag for correction at
+smoke-test time if this model's `parse_failure` rate looks wrong.
+Detection is tag-based and purely a label (extraction itself scans the
+whole text for any JSON object/array regardless of tags, so content
+inside an unrecognized or absent tag still parses as before); Granite's
+and Phi-4-mini's tag checks share the same opening literal
+(`<|tool_call|>`), so Phi-4-mini's paired-tag check runs first. Tested
+with one literal example string per format in
+`tests/test_native_tool_formats.py` (14 tests). `runner.py` now calls
+`extract_tool_call_with_format()` and logs the result as a new
+`detected_format` field in `parsed_results.jsonl` (and
+`retry_detected_format` in `raw_outputs.jsonl` for the retry attempt) —
+purely additive fields, so every existing `parsed_call`/`metrics` value
+for a historical run is unchanged. 137/137 tests pass (123 prior + 14 new).
+
+**Still unclear / unverified:**
+- Phi-4-mini's output format (above) is a best-effort guess, not a
+  confirmed convention.
 - F4's `full_schema` level uses JSON Schema's `const` keyword to constrain
   the tool name. This is valid JSON Schema, but whether llama.cpp's
   grammar converter (`LlamaGrammar.from_json_schema`) actually supports
@@ -182,9 +205,11 @@ test's pattern), including a regression guard pinning down the documented
    handling for any real model.
 2. **`enable_thinking`'s exact template variable name is a guess**, not
    confirmed against Qwen3's actual embedded template text.
-3. **F3 native mode may fail to parse some models' native tool-call
-   format** (e.g. a `"parameters"` key instead of `"arguments"`) — not
-   fixed speculatively; check at smoke-test time if `parse_failure` spikes.
+3. **F3 native mode now parses every documented native tool-call format**
+   (parameters-alias, list-wrapped, and four tag-wrapped conventions —
+   2026-10-04 follow-up), except Phi-4-mini's, which is a best-effort
+   guess with no confirmed official example — check its `parse_failure`
+   rate specifically at smoke-test time.
 4. **F4 `full_schema`'s use of JSON Schema `const`** is unverified against
    llama.cpp's grammar converter.
 5. **`fault_reporting`'s status-mapping and fabrication rule are my
