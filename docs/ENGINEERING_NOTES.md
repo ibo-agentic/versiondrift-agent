@@ -56,9 +56,24 @@ project's internal schema via `upgradecanary/constrained.py`'s
 `schema_to_openai_tool()`. F4 (`constrained_decoding: "off"|"generic_json"
 |"full_schema"`): builds a JSON Schema and passes it to
 `LlamaGrammar.from_json_schema`. F6 (`sampling_preset`): logging-only flag
-— `docs/sampling_presets.md` has 4 of 14 models filled in from memory of
-their public model cards (**not re-verified this session**); the other 10
-are explicitly marked UNVERIFIED, not given invented numbers.
+— `docs/sampling_presets.md` originally had 4 of 14 models filled in from
+memory, not re-verified. **2026-10-04 follow-up**: re-fetched every
+model's actual `generation_config.json`/model card from Hugging Face live
+this session (16 models, including the Qwen3 thinking/non-thinking split)
+rather than relying on memory. Result: 7 models/variants have a genuine
+official value (Qwen2, Qwen2.5, Qwen3 thinking, Qwen3 non-thinking,
+Llama-3, Llama-3.1, and a partial/weaker-evidence row for Gemma-3-4b-it —
+top_p/top_k only, no temperature set in its generation_config.json); 10
+have **no** official recommendation at all (Mistral v0.1/v0.2/v0.3,
+Phi-3-mini/3.5-mini/4-mini, Granite 3.0/3.1/3.2, Gemma-2-2b-it) — their
+`generation_config.json` files carry no sampling keys whatsoever (only
+token ids), and their model cards' example code snippets use
+`temperature=0.0`/`do_sample=False` illustratively, not as a
+recommendation, so they are correctly marked "use shared" rather than
+guessed. `meta-llama/*` and `google/gemma-3-4b-it` are gated (HTTP 401);
+an ungated community mirror of the same unmodified file was used instead
+for those, same mirrors as `analysis/plan/feasibility.md` already
+cross-checked.
 
 **2026-10-04 follow-up — native format support added.** `parsing.py` now
 has `extract_tool_call_with_format()`, which accepts every documented
@@ -227,8 +242,11 @@ test's pattern), including a regression guard pinning down the documented
 5. **Resolved 2026-10-04**: `fault_reporting`'s status-mapping and
    fabrication rule now follow the user's exact rule (PLAN.md section 3),
    replacing this batch's earlier interpretation.
-6. **Sampling presets: only 4 of 14 models have a (session-unverified)
-   recommended value**; the other 10 are UNVERIFIED, not invented.
+6. **Resolved 2026-10-04**: sampling presets re-fetched live from each
+   model's own Hugging Face `generation_config.json`/model card.
+   7 models/variants have a cited official value; the other 10
+   genuinely have none (not UNVERIFIED-pending-lookup — looked up and
+   confirmed absent) and must use `sampling_preset: shared`.
 7. **A/A (6×3) and positive-control (4 models) matrices are not
    instantiated** — pending D-protocol base configs for the other 14
    models (a later PLAN.md step) and, for Q2_K, a download decision.
