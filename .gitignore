@@ -11,3 +11,4 @@ __pycache__/
 scripts/*.log
 *.gguf
 *.zip
+.claude/
