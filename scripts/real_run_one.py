@@ -37,12 +37,23 @@ PROTOCOL_THINKING = {
     "D": "default",
     "F2": "off",
     "F1": "default",
+    "F3": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
     "D": 256,
     "F2": 256,
     "F1": 1024,
+    "F3": 256,
+}
+# protocol -> prompt_format override. F3 is the only one that changes
+# the tool-format mechanism (native chat template + tools= instead of
+# the shared JSON-in-prompt schema dump).
+PROTOCOL_PROMPT_FORMAT = {
+    "D": "shared",
+    "F2": "shared",
+    "F1": "shared",
+    "F3": "native",
 }
 
 
@@ -52,6 +63,7 @@ def build_config(
 ) -> dict:
     thinking = PROTOCOL_THINKING[protocol]
     max_tokens = PROTOCOL_MAX_TOKENS[protocol]
+    prompt_format = PROTOCOL_PROMPT_FORMAT[protocol]
     if output_dir is None:
         output_dir = f"results_v2/{protocol}/{model_key}/{suite}"
     return {
@@ -63,7 +75,7 @@ def build_config(
         "trials": 3,
         "trial_temperatures": [0.0, 0.7, 0.7],
         "trial_seeds": [1234, 1235, 1236],
-        "prompt_format": "shared",
+        "prompt_format": prompt_format,
         "constrained_decoding": "off",
         "model": {
             "provider": "llama_cpp",

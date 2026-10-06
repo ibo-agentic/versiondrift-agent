@@ -4,6 +4,62 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-06 — F3 native-template parse rates: root causes found, no harness changes
+
+**Phi-4-mini**: F3's quick test (5 tasks/suite) showed 0-37% parse rate,
+much lower than the 50% seen in the original smoke test. Root-caused
+directly, not assumed: the smoke test ran *before* the F3/D task-text
+parity fix (see commit `ea992eb`), so it used the bare-question prompt;
+this quick test ran *after* that fix, using `"You are an agent that
+answers questions by calling tools.\nQuestion: {task.prompt}"`. Tested
+both prompt forms back-to-back against the identical model/seed/
+temperature: the bare-question form reliably produces clean JSON
+(`[{"name": "get_weather", ...}]`); the exact same task with the added
+framing sentence reliably produces prose + a Python call instead. **The
+task-framing sentence itself is what changes Phi-4-mini's native
+tool-use compliance.** This is not a harness bug -- the fix that added
+the framing was correct and intentional (explicit instruction: F3 must
+carry the same task text as D, only the tool format should differ), and
+changing it back now would reintroduce the very confound that fix was
+meant to remove. Verified the prompt is otherwise fully correct for F3
+(tools present in a `system` message via the existing fallback, correct
+tool name, correct task text, prompt correctly ends on `<|assistant|>`).
+**Decision: no harness change. Phi-4-mini's low F3 parse rate (0% on
+bfcl_multiple, worse on more complex/multi-tool prompts) is logged as a
+real finding** -- this model's native tool-template compliance is
+sensitive to the exact framing of the preceding user turn, and gets
+substantially worse as task complexity increases, even though the
+prompt and tool list are both unambiguously correct.
+
+**Qwen3**: F3's quick test showed truncation rates of 71% (`bfcl_simple`)
+and 98% (`bfcl_multiple`) -- markedly worse than D's 38%/55% on the same
+suites. Split every failed parse into format-failure vs. truncation: of
+54 total failures across both suites, **all 54 were truncation (0 were
+format failures)** -- inspected 3 examples directly, all three are still
+mid-`<think>` reasoning block, with no closing tag, when the 256-token
+cap hits. Likely cause: the native template's own tool-definition
+rendering (Qwen's `<tools>` XML-tag convention in the system message)
+gives the model more to reason about than D's in-prompt schema dump,
+pushing an already-tight thinking budget further over. **Decision: no
+harness change** -- this is the same accepted F1/D finding (Qwen3's
+default thinking competes with a fixed token budget), observed again
+and intensified under F3; D itself was already left unchanged for the
+same reason (see `smoke_report.md` Problem 2).
+
+**Granite-3.1** (the third quick-test model): 1/90 format failures,
+otherwise clean -- not investigated further, negligible.
+
+**Preemptive split for qwen3/F3**: given the quick test's truncation
+rates (71%/98% on `bfcl_simple`/`bfcl_multiple`), both suites are at
+real risk of exceeding the 2-hour background-execution ceiling (D's
+equivalent runs already took 81-85 minutes at much lower truncation).
+Generalized the F1 split mechanism into `scripts/split_run.py` (any
+protocol/model/suite, not just the one F1 case) and used it
+preemptively for `qwen3/F3/bfcl_simple` and `qwen3/F3/bfcl_multiple`,
+rather than waiting to hit the ceiling twice as happened under F1.
+`qwen3/F3/synthetic` was left as a single run (truncation improved to
+4.4% in the quick test, no risk).
+
 ## 2026-10-06 — F1's qwen3/bfcl_multiple run split into two halves
 
 **Reason**: this one run consistently exceeded the ~2-hour background-
