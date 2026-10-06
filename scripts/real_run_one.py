@@ -31,10 +31,18 @@ import yaml  # noqa: E402
 
 from scripts.real_run_models import EXPECTED_RECORDS_PER_RUN, MODEL_ORDER, SUITES  # noqa: E402
 
-# protocol -> (thinking override, None means omit the key / runner default "default")
+# protocol -> model.thinking override. "default" == D's own behavior
+# (Qwen3 thinking on by its own default; a no-op for every other model).
 PROTOCOL_THINKING = {
     "D": "default",
     "F2": "off",
+    "F1": "default",
+}
+# protocol -> max_tokens override. D's only output-budget factor is F1.
+PROTOCOL_MAX_TOKENS = {
+    "D": 256,
+    "F2": 256,
+    "F1": 1024,
 }
 
 
@@ -43,6 +51,7 @@ def build_config(
     protocol: str = "D", output_dir: str | None = None,
 ) -> dict:
     thinking = PROTOCOL_THINKING[protocol]
+    max_tokens = PROTOCOL_MAX_TOKENS[protocol]
     if output_dir is None:
         output_dir = f"results_v2/{protocol}/{model_key}/{suite}"
     return {
@@ -63,7 +72,7 @@ def build_config(
             "n_ctx": 4096,
             "n_gpu_layers": -1,
             "temperature": 0.0,
-            "max_tokens": 256,
+            "max_tokens": max_tokens,
             "seed": 1234,
             # Explicit on every protocol (including D) so this key's
             # presence/absence is never itself a point of difference
