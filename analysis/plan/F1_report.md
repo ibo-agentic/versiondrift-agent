@@ -29,6 +29,28 @@ higher than D's 0.056 at full 100-task scale, but `bfcl_multiple`'s 0.039
 is; the quick-test's 5-task sample overstated the effect somewhat, but
 the pattern itself is real).
 
+**2026-10-06 follow-up investigation**: pulled `phi35_mini`'s
+`native_stop_tokens` from `run_manifest.json`: `['<|endoftext|>',
+'<|end|>']`, with `<|end|>` as the dedicated end-of-turn token --
+correctly configured. Across all 3 F1 suites, truncation concentrates
+almost entirely in `fault_reporting` (38/38 truncations on
+`bfcl_simple`, 29/35 on `bfcl_multiple`, 19/19 on `synthetic` -- only 6
+total truncations across all suites fall outside that condition).
+Inspected 3 concrete examples (one per suite): in every case the model
+answers the real question correctly, then immediately starts a
+fabricated new `"Question: ..."` turn and keeps going until it hits the
+1024-token cap. **The literal end-token text never appears in any of
+these outputs**, and since each is `truncated=True` (finish_reason
+`"length"`), the model never triggered a stop condition at all --
+neither the text-level stop strings nor llama.cpp's own token-level
+end-of-generation detection fired, because both require the model to
+actually emit that token, which it does not do here. **Conclusion: this
+is model behavior, not a harness bug.** The harness's stop
+configuration is correct; Phi-3.5-mini itself doesn't reliably emit an
+end token after a short expected answer when given a large token
+budget, and instead lapses into continuing the text as if it were a
+longer training document with multiple Q&A turns.
+
 ## Qwen3/bfcl_multiple: split into two halves
 
 This one run consistently exceeded the ~2-hour background-execution
