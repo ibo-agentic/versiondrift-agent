@@ -42,11 +42,16 @@ class MockModelClient:
         seed: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         response_schema: dict[str, Any] | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        min_p: float | None = None,
+        repeat_penalty: float | None = None,
     ) -> str:
-        # temperature/seed/tools/response_schema are accepted for interface
-        # compatibility with real backends; the mock is fully deterministic
-        # and ignores all of them (it already always emits a well-formed,
-        # schema-matching call -- there is nothing for a grammar to constrain).
+        # temperature/seed/tools/response_schema/top_p/top_k/min_p/
+        # repeat_penalty are accepted for interface compatibility with real
+        # backends; the mock is fully deterministic and ignores all of them
+        # (it already always emits a well-formed, schema-matching call --
+        # there is nothing for a grammar or sampling preset to affect).
         context = context or {}
         task = context["task"]
         condition = context.get("condition", "baseline")

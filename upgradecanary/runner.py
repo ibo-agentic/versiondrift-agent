@@ -218,11 +218,33 @@ def _safe_execute(parsed, schema, drift, fault, strict, canonical_schema=None) -
         }
 
 
+_TRIAL_SAMPLING_KEYS = {
+    "trial_top_p": ("top_p", float),
+    "trial_top_k": ("top_k", int),
+    "trial_min_p": ("min_p", float),
+    "trial_repeat_penalty": ("repeat_penalty", float),
+}
+
+
 def build_trials(cfg: dict[str, Any]) -> list[dict[str, Any]]:
-    """Resolve the trial list from config: one {temperature, seed} per trial.
+    """Resolve the trial list from config: one {temperature, seed, ...} per
+    trial.
 
     ``trial_temperatures``/``trial_seeds`` fall back to the model's defaults
     repeated ``trials`` times; explicit lists must match ``trials`` in length.
+
+    2026-10-07, PLAN.md F6: ``trial_top_p``/``trial_top_k``/``trial_min_p``/
+    ``trial_repeat_penalty`` are optional, parallel per-trial override lists
+    (same length-``trials`` convention as the two above). Omitted for every
+    existing config (D/F1/F2/F3), so those trials carry no override key at
+    all and ``ModelClient.generate()`` falls back to the client's own
+    model-level default -- byte-identical to before this change. F6 uses
+    these to vary top_p/top_k/min_p/repeat_penalty on the 2 sampled trials
+    only, while the greedy trial (index 0) explicitly keeps D's own values
+    -- a model-level override would also reach the greedy trial for
+    repeat_penalty specifically, since (unlike top_p/top_k/min_p) it is not
+    gated by temperature in llama.cpp's sampling pipeline (see
+    DEVIATIONS.md).
     """
     n = int(cfg.get("trials", 1))
     if n < 1:
@@ -239,7 +261,16 @@ def build_trials(cfg: dict[str, Any]) -> list[dict[str, Any]]:
             f"trials={n} but trial_temperatures has {len(temps)} entries "
             f"and trial_seeds has {len(seeds)}"
         )
-    return [{"temperature": float(t), "seed": int(s)} for t, s in zip(temps, seeds)]
+    trials = [{"temperature": float(t), "seed": int(s)} for t, s in zip(temps, seeds)]
+    for cfg_key, (trial_key, caster) in _TRIAL_SAMPLING_KEYS.items():
+        values = cfg.get(cfg_key)
+        if values is None:
+            continue
+        if len(values) != n:
+            raise ValueError(f"trials={n} but {cfg_key} has {len(values)} entries")
+        for trial, v in zip(trials, values):
+            trial[trial_key] = caster(v)
+    return trials
 
 
 def task_base_schema(task: Task) -> dict[str, Any]:
@@ -338,6 +369,14 @@ def run(config_path: str) -> dict[str, Any]:
                 temperature = trial["temperature"]
                 trial_seed = trial["seed"]
                 context = dict(base_context, trial_index=trial_index)
+                # PLAN.md F6: only present when the config supplies a
+                # trial_top_p/trial_top_k/trial_min_p/trial_repeat_penalty
+                # list (see build_trials) -- absent for every existing D/F1/
+                # F2/F3 config, so **sampling_kwargs is empty and every call
+                # below is byte-identical to before this change.
+                sampling_kwargs = {
+                    k: trial[k] for k in ("top_p", "top_k", "min_p", "repeat_penalty") if k in trial
+                }
 
                 if condition == "fault_reporting":
                     # Single-turn: no real tool-call attempt first (see
@@ -346,7 +385,9 @@ def run(config_path: str) -> dict[str, Any]:
                     # the status/answer report, so it skips the entire
                     # tool-call parse/execute/retry machinery below.
                     fr_prompt = build_fault_reporting_prompt(task, fault)
-                    raw = client.generate(fr_prompt, context, temperature=temperature, seed=trial_seed)
+                    raw = client.generate(
+                        fr_prompt, context, temperature=temperature, seed=trial_seed, **sampling_kwargs
+                    )
                     truncated = (
                         client.last_truncated() if hasattr(client, "last_truncated") else None
                     )
@@ -387,7 +428,7 @@ def run(config_path: str) -> dict[str, Any]:
 
                 raw = client.generate(
                     prompt, context, temperature=temperature, seed=trial_seed,
-                    tools=tools, response_schema=response_schema,
+                    tools=tools, response_schema=response_schema, **sampling_kwargs,
                 )
                 truncated = (
                     client.last_truncated() if hasattr(client, "last_truncated") else None
@@ -422,6 +463,7 @@ def run(config_path: str) -> dict[str, Any]:
                         seed=trial_seed,
                         tools=tools,
                         response_schema=response_schema,
+                        **sampling_kwargs,
                     )
                     retry_truncated = (
                         client.last_truncated() if hasattr(client, "last_truncated") else None

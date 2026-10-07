@@ -4,6 +4,74 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-07 — F6 (sampling preset): per-trial overrides added, table + plan before running
+
+**Applied values table** (sampled trials 1/2 only; greedy, trial 0, always
+uses D's own `top_p=0.95, top_k=40, min_p=0.05, repeat_penalty=1.0,
+temperature=0.0` -- see mechanism below). Source for every row:
+`docs/sampling_presets.md` (fetched live 2026-10-04 from each model's own
+`generation_config.json` and/or model card; full citations there).
+
+| Model | temperature | top_p | top_k | min_p | repeat_penalty | Recommendation? |
+|---|---|---|---|---|---|---|
+| gemma2_2b | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| gemma3_4b | 0.7 (D, no temp rec.) | 0.95 | 64 | 0.05 (D) | 1.0 (D) | partial (top_p/top_k only) |
+| phi3_mini | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| qwen2 | 0.7 | 0.8 | 20 | 0.05 (D) | 1.05 | yes |
+| llama31 | 0.6 | 0.9 | 40 (D) | 0.05 (D) | 1.0 (D) | partial (temp/top_p only) |
+| mistral_v01 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| qwen25 | 0.7 | 0.8 | 20 | 0.05 (D) | 1.05 | yes |
+| mistral_v03 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| llama3 | 0.6 | 0.9 | 40 (D) | 0.05 (D) | 1.0 (D) | partial (temp/top_p only) |
+| granite32 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| granite31 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| granite30 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| phi4_mini | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| mistral_v02 | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| phi35_mini | 0.7 (D) | 0.95 (D) | 40 (D) | 0.05 (D) | 1.0 (D) | none -- keep D |
+| qwen3 (thinking stays on, default) | 0.6 | 0.95 (D, same) | 20 | 0.0 | 1.0 (D) | yes, thinking-ON values |
+
+**Mechanism -- per-trial sampling overrides added, not a client-level
+change**: `top_p`/`top_k`/`min_p`/`repeat_penalty` were previously set
+once per model client and applied to every trial including greedy
+(`upgradecanary/model/llama_cpp_client.py`). In llama.cpp's sampling
+pipeline, `temperature=0` (greedy) bypasses `top_p`/`top_k`/`min_p`, but
+**`repeat_penalty` is a logit-level penalty applied regardless of
+temperature** -- a client-level change would have silently made Qwen2/
+Qwen2.5's greedy trial (the only two models with a `repeat_penalty`
+recommendation != D's `1.0`) diverge from D, breaking "change only one
+thing." Added real per-trial overrides instead: `runner.build_trials()`
+now accepts optional `trial_top_p`/`trial_top_k`/`trial_min_p`/
+`trial_repeat_penalty` config lists (parallel to the existing
+`trial_temperatures`/`trial_seeds`, same length-`trials` convention),
+and `ModelClient.generate()` (both `LlamaCppClient` and `MockModelClient`)
+now accepts `top_p`/`top_k`/`min_p`/`repeat_penalty` as optional per-call
+kwargs, falling back to the client's own default when omitted. Every
+existing D/F1/F2/F3 config has none of these keys, so `build_trials()`
+produces trial dicts with no extra keys and every `client.generate()`
+call site sends an empty `**sampling_kwargs` -- byte-identical to before
+this change (confirmed: full test suite passes, 166/168 -- 2 pre-existing
+skips -- plus 4 new tests added for this mechanism in `tests/
+test_pilot.py`). `scripts/real_run_one.py`'s F6 branch sets `trial_top_p`
+etc. to `[D_default, recommended, recommended]` per model from the table
+above, and leaves the model-level `top_p`/`top_k`/`min_p`/`repeat_penalty`
+keys unset (so the client's own default, used for any call with no
+per-trial override, stays exactly D's).
+
+**Quick test (5 tasks/suite, gemma2_2b/qwen2/llama31 -- one with no
+recommendation, one with a repeat_penalty change, one without)**:
+manifest's `run_factors.F6_sampling_preset` correctly reads
+`"recommended"` for all 3; generated YAML configs show the exact
+per-trial lists from the table above. **Greedy-record check**: compared
+every trial-0 `raw_output` against the matching D record (by task_id +
+condition) for all 3 models x all 3 suites (9 combinations, 15 greedy
+records each) -- **0/135 mismatches**, including qwen2 (the
+repeat_penalty=1.05 case), confirming the per-trial mechanism genuinely
+isolates greedy from the sampling-preset change. **Sampled-trial sanity
+check**: qwen2/synthetic's trial 1/2 raw outputs differ from D's on 3/30
+records -- confirms the override is actually reaching generation, not a
+silent no-op.
+
 ## 2026-10-07 — Granite-3.0 parser fix: verification follow-up, no GPU
 
 Follow-up checks on the fix below, run before touching F6 (sampling

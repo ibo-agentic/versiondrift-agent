@@ -319,6 +319,10 @@ class LlamaCppClient:
         seed: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         response_schema: dict[str, Any] | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
+        min_p: float | None = None,
+        repeat_penalty: float | None = None,
     ) -> str:
         stop = self._stop
         if self._chat_wrapping == "native":
@@ -397,6 +401,14 @@ class LlamaCppClient:
 
         # Per-call temperature/seed support repeated trials. llama-cpp-python
         # accepts both per call; seeding is best-effort on GPU (see README).
+        # top_p/top_k/min_p/repeat_penalty are per-call too (2026-10-07,
+        # PLAN.md F6: a model-level override would also change the greedy
+        # (temperature=0) trial's output for repeat_penalty specifically --
+        # unlike top_p/top_k/min_p, it is not gated by temperature in
+        # llama.cpp's sampling pipeline, so it would silently break "the
+        # greedy trial stays greedy [i.e. matches D]" otherwise. Falls back
+        # to the model-level default (self._top_p etc.) when the caller
+        # doesn't override, so every existing call site is unaffected.
         kwargs: dict[str, Any] = {
             "prompt": prompt,
             "temperature": self._temperature if temperature is None else float(temperature),
@@ -406,10 +418,10 @@ class LlamaCppClient:
             # was actually sent (2026-10-02 follow-up, item 4). These equal
             # llama-cpp-python's own defaults unless a config overrides them,
             # so rerunning any existing config is unaffected.
-            "top_p": self._top_p,
-            "top_k": self._top_k,
-            "min_p": self._min_p,
-            "repeat_penalty": self._repeat_penalty,
+            "top_p": self._top_p if top_p is None else float(top_p),
+            "top_k": self._top_k if top_k is None else int(top_k),
+            "min_p": self._min_p if min_p is None else float(min_p),
+            "repeat_penalty": self._repeat_penalty if repeat_penalty is None else float(repeat_penalty),
         }
         if stop:
             kwargs["stop"] = stop

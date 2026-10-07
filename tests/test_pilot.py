@@ -233,6 +233,84 @@ def test_trial_config_validation():
     assert ok == [{"temperature": 0.0, "seed": 9}] * 2
 
 
+def test_build_trials_per_trial_sampling_overrides():
+    # PLAN.md F6: trial_top_p/trial_top_k/trial_min_p/trial_repeat_penalty
+    # are optional, parallel per-trial lists -- greedy (trial 0) can keep
+    # D's own values while sampled trials 1/2 use a model's recommended
+    # preset, all within one run.
+    cfg = {
+        "trials": 3,
+        "model": {"temperature": 0.0, "seed": 1234},
+        "trial_temperatures": [0.0, 0.6, 0.6],
+        "trial_seeds": [1234, 1235, 1236],
+        "trial_top_p": [0.95, 0.8, 0.8],
+        "trial_top_k": [40, 20, 20],
+        "trial_min_p": [0.05, 0.0, 0.0],
+        "trial_repeat_penalty": [1.0, 1.05, 1.05],
+    }
+    trials = runner.build_trials(cfg)
+    assert trials == [
+        {"temperature": 0.0, "seed": 1234, "top_p": 0.95, "top_k": 40, "min_p": 0.05, "repeat_penalty": 1.0},
+        {"temperature": 0.6, "seed": 1235, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "repeat_penalty": 1.05},
+        {"temperature": 0.6, "seed": 1236, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "repeat_penalty": 1.05},
+    ]
+    # top_k is cast to int even if the YAML loader hands back a float.
+    assert isinstance(trials[0]["top_k"], int)
+
+
+def test_build_trials_sampling_override_length_mismatch():
+    cfg = {
+        "trials": 2,
+        "model": {"temperature": 0.0, "seed": 1234},
+        "trial_repeat_penalty": [1.0, 1.05, 1.1],  # 3 entries for 2 trials
+    }
+    with pytest.raises(ValueError):
+        runner.build_trials(cfg)
+
+
+def test_build_trials_without_sampling_overrides_omits_the_keys():
+    # Every existing D/F1/F2/F3 config has no trial_top_p/etc. key at all --
+    # confirms the trial dicts carry no extra keys in that case, so
+    # **sampling_kwargs at each client.generate() call site is empty and
+    # every pre-F6 run is byte-identical to before this change.
+    trials = runner.build_trials({"trials": 2, "model": {"temperature": 0.0, "seed": 9}})
+    assert trials == [{"temperature": 0.0, "seed": 9}, {"temperature": 0.0, "seed": 9}]
+    assert all(set(t) == {"temperature", "seed"} for t in trials)
+
+
+def test_per_trial_sampling_overrides_reach_generate(tmp_path, monkeypatch):
+    # Integration-level: confirms build_trials' per-trial sampling dict
+    # actually reaches ModelClient.generate() at the right trial_index, not
+    # just that build_trials() itself resolves correctly in isolation.
+    from upgradecanary.model.mock_llm import MockModelClient
+
+    calls = []
+
+    class RecordingClient(MockModelClient):
+        def generate(self, prompt, context=None, **kwargs):
+            calls.append((context.get("trial_index"), kwargs.get("top_p"), kwargs.get("repeat_penalty")))
+            return super().generate(prompt, context, **kwargs)
+
+    monkeypatch.setattr(runner, "create_client", lambda model_cfg: RecordingClient(model_cfg.get("mock", {})))
+
+    cfg_path = _trials_config(tmp_path, tmp_path / "out", trials=3)
+    cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    cfg["trial_top_p"] = [0.95, 0.8, 0.8]
+    cfg["trial_top_k"] = [40, 20, 20]
+    cfg["trial_min_p"] = [0.05, 0.0, 0.0]
+    cfg["trial_repeat_penalty"] = [1.0, 1.05, 1.05]
+    cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+
+    runner.run(str(cfg_path))
+
+    assert calls  # at least one generate() call recorded
+    for trial_index, top_p, repeat_penalty in calls:
+        if trial_index == 0:
+            assert (top_p, repeat_penalty) == (0.95, 1.0)
+        else:
+            assert (top_p, repeat_penalty) == (0.8, 1.05)
+
+
 def _mini_bfcl_record(question, fn_name="calc_area", props=None, required=None):
     props = props or {"base": {"type": "integer"}, "height": {"type": "integer"}}
     required = required if required is not None else ["base", "height"]

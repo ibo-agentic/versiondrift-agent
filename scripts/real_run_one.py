@@ -43,6 +43,9 @@ PROTOCOL_THINKING = {
     # every way, written to a separate folder so the original F3 data
     # is kept untouched. See DEVIATIONS.md.
     "F3_rerun": "default",
+    # F6 (sampling preset): thinking stays "default" (on) for Qwen3, same
+    # as D -- only the sampling preset changes under this protocol.
+    "F6": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -51,6 +54,7 @@ PROTOCOL_MAX_TOKENS = {
     "F1": 1024,
     "F3": 256,
     "F3_rerun": 256,
+    "F6": 256,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -61,6 +65,36 @@ PROTOCOL_PROMPT_FORMAT = {
     "F1": "shared",
     "F3": "native",
     "F3_rerun": "native",
+    "F6": "shared",
+}
+
+# D's own shared sampling defaults (upgradecanary/model/llama_cpp_client.py's
+# library defaults) -- F6's greedy trial (index 0) is always pinned to
+# these explicitly, never to a model's recommended preset, so repeat_penalty
+# (not gated by temperature=0 in llama.cpp's sampling pipeline, unlike
+# top_p/top_k/min_p) can never make greedy diverge from D. See DEVIATIONS.md.
+_D_SAMPLING_DEFAULTS = {"top_p": 0.95, "top_k": 40, "min_p": 0.05, "repeat_penalty": 1.0}
+_D_SAMPLED_TRIAL_TEMPERATURE = 0.7
+
+# 2026-10-07, PLAN.md F6 (sampling preset): per-model recommended sampling
+# values for the 2 SAMPLED trials only (trial 0/greedy always uses
+# _D_SAMPLING_DEFAULTS + temperature=0.0, both here and in D). Source:
+# docs/sampling_presets.md (fetched live 2026-10-04 from each model's own
+# generation_config.json and/or model card -- see that file for exact
+# citations). A model not listed here has no official recommendation, per
+# that file, and uses _D_SAMPLING_DEFAULTS/_D_SAMPLED_TRIAL_TEMPERATURE
+# unchanged -- "keep the D value" per explicit instruction.
+F6_RECOMMENDED_SAMPLING: dict[str, dict] = {
+    "qwen2": {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.05, "repeat_penalty": 1.05},
+    "qwen25": {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.05, "repeat_penalty": 1.05},
+    # Thinking stays "default" (on) under F6, same as D -- uses Qwen3's own
+    # thinking-mode recommended values, not the non-thinking-mode ones.
+    "qwen3": {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "repeat_penalty": 1.0},
+    "llama3": {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "min_p": 0.05, "repeat_penalty": 1.0},
+    "llama31": {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "min_p": 0.05, "repeat_penalty": 1.0},
+    # temperature has no stated recommendation for this model (see
+    # docs/sampling_presets.md's caveat) -- keeps D's sampled-trial value.
+    "gemma3_4b": {"temperature": 0.7, "top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1.0},
 }
 
 
@@ -73,6 +107,24 @@ def build_config(
     prompt_format = PROTOCOL_PROMPT_FORMAT[protocol]
     if output_dir is None:
         output_dir = f"results_v2/{protocol}/{model_key}/{suite}"
+
+    sampled_temp = _D_SAMPLED_TRIAL_TEMPERATURE
+    model_extra: dict = {}
+    if protocol == "F6":
+        preset = F6_RECOMMENDED_SAMPLING.get(model_key, {"temperature": sampled_temp, **_D_SAMPLING_DEFAULTS})
+        sampled_temp = preset["temperature"]
+        model_extra["sampling_preset"] = "recommended"
+        trial_sampling_extra = {
+            "trial_top_p": [_D_SAMPLING_DEFAULTS["top_p"], preset["top_p"], preset["top_p"]],
+            "trial_top_k": [_D_SAMPLING_DEFAULTS["top_k"], preset["top_k"], preset["top_k"]],
+            "trial_min_p": [_D_SAMPLING_DEFAULTS["min_p"], preset["min_p"], preset["min_p"]],
+            "trial_repeat_penalty": [
+                _D_SAMPLING_DEFAULTS["repeat_penalty"], preset["repeat_penalty"], preset["repeat_penalty"]
+            ],
+        }
+    else:
+        trial_sampling_extra = {}
+
     return {
         "experiment": f"upgradecanary-real-{protocol}-{model_key}-{suite}",
         "seed": 1234,
@@ -80,8 +132,9 @@ def build_config(
         "output_dir": output_dir,
         "conditions": ["baseline", "schema_drift", "fault_reporting"],
         "trials": 3,
-        "trial_temperatures": [0.0, 0.7, 0.7],
+        "trial_temperatures": [0.0, sampled_temp, sampled_temp],
         "trial_seeds": [1234, 1235, 1236],
+        **trial_sampling_extra,
         "prompt_format": prompt_format,
         "constrained_decoding": "off",
         "model": {
@@ -99,6 +152,15 @@ def build_config(
             # omitting the key (LlamaCppClient's own default), so D's
             # runs are unaffected by making this explicit.
             "thinking": thinking,
+            # F6 only (model_extra is {} for every other protocol): the
+            # client-level top_p/top_k/min_p/repeat_penalty keys are
+            # deliberately left UNSET here even under F6 -- they'd equal
+            # _D_SAMPLING_DEFAULTS anyway, and the greedy trial already gets
+            # those same values explicitly via trial_top_p[0] etc. above, so
+            # setting them here too would be redundant, not a behavior
+            # change. Only "sampling_preset" (a logging/documentation flag,
+            # see docs/sampling_presets.md) is actually added.
+            **model_extra,
         },
         "perturbations": {
             "schema_drift": {
