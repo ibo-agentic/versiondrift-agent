@@ -23,12 +23,27 @@ The 8 models with a real native tool-calling template, x 3 suites, 100 tasks eac
 | granite31 | synthetic | 900 | 1.000 | 0.002 | 0.950 | 694 |
 | granite31 | bfcl_simple | 900 | 1.000 | 0.001 | 0.830 | 945 |
 | granite31 | bfcl_multiple | 900 | 0.978 | 0.000 | 0.740 | 967 |
-| granite30 | synthetic | 900 | 0.873 | 0.001 | 0.880 | 855 |
-| granite30 | bfcl_simple | 900 | 0.702 | 0.028 | 0.570 | 1428 |
-| granite30 | bfcl_multiple | 900 | 0.680 | 0.042 | 0.410 | 1561 |
-| phi4_mini | synthetic | 900 | 0.295 | 0.000 | 0.240 | 561 |
-| phi4_mini | bfcl_simple | 900 | 0.212 | 0.006 | 0.100 | 748 |
-| phi4_mini | bfcl_multiple | 900 | 0.158 | 0.014 | 0.060 | 795 |
+| granite30 [^1] | synthetic | 900 | 0.890 | 0.001 | 0.900 | 855 |
+| granite30 [^1] | bfcl_simple | 900 | 0.717 | 0.028 | 0.570 | 1428 |
+| granite30 [^1] | bfcl_multiple | 900 | 0.695 | 0.042 | 0.420 | 1561 |
+| phi4_mini [^2] | synthetic | 900 | 0.298 | 0.000 | 0.240 | 561 |
+| phi4_mini [^2] | bfcl_simple | 900 | 0.212 | 0.006 | 0.100 | 748 |
+| phi4_mini [^2] | bfcl_multiple | 900 | 0.162 | 0.014 | 0.060 | 795 |
+
+[^1]: 2026-10-07 update: these rows are `results_v2/F3_rerun/granite30/`
+(the official result as of 2026-10-07), not the original
+`results_v2/F3/granite30/` run. A parser gap was found and fixed
+(Granite-3.0's `{"type":"function","function":"<name string>",...}`
+and combined `function`+`parameters` hybrid shapes); raw model output
+is confirmed byte-identical between the two folders, so every number
+change here is the parser fix, not a model-output difference. Seconds
+column still reflects the original run's wall-clock time (the rerun
+was not separately timed as an official run). Full writeup in
+`DEVIATIONS.md`.
+
+[^2]: 2026-10-07 update: rescored in place from the same raw outputs
+(no rerun -- deterministic, no GPU needed) with the same parser fix.
+See `DEVIATIONS.md`.
 | qwen3 | synthetic | 900 | 0.962 | 0.114 | 1.000 | 3540 |
 | qwen3 | bfcl_simple | 900 | 0.658 | 0.401 | 0.630 | 2323 |
 | qwen3 | bfcl_multiple | 900 | 0.542 | 0.458 | 0.470 | 4692 |

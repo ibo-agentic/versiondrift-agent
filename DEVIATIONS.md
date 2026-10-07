@@ -4,6 +4,88 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-07 — Granite-3.0 parser fix: verification follow-up, no GPU
+
+Follow-up checks on the fix below, run before touching F6 (sampling
+preset). All via `scripts/rescore_with_fixed_parser.py`, which replays
+the real `evaluator.evaluate()`/`_safe_execute()` against each stored
+`raw_output` with the current parser -- never re-generates model text.
+
+**Correction to the 12/447 figure below**: that number came from a
+regex match against one specific literal shape and undercounted the
+fix's real scope. An exact, code-level rescore of granite30's F3 data
+(all 3 suites, baseline + schema_drift records only -- fault_reporting
+uses a separate, untouched extraction function) found **28 total
+record-level diffs** out of 1800 tool-call-eligible records (1.6%): 10
+on `synthetic`, 9 on `bfcl_simple`, 9 on `bfcl_multiple`. The gap: some
+diffs recover via `function_name_alias` alone, but several recover via
+`function_name_alias` *combined* with the pre-existing `parameters_alias`
+-- a shape like `{"function": "<name string>", "parameters": {...}}`
+with no `"name"` or `"arguments"` key at all, which was fully
+unparseable before (name was `None`, so even the old `parameters_alias`
+branch never triggered). The regex only caught the narrower
+`{"type":"function","function":"<name>","arguments":{...}}` shape.
+Confirmed raw model text is **100% byte-identical** between
+`results_v2/F3/granite30/` and `results_v2/F3_rerun/granite30/`
+(checked directly, 0/900 diffs on `synthetic`) -- every parse/score
+change between them is attributable to the parser fix alone, nothing
+about the model run differs.
+
+**`results_v2/F3_rerun/granite30/` is now the official granite30 F3
+result.** `results_v2/F3/granite30/` is kept on disk, unmodified, as
+the pre-fix original for audit purposes only -- not used in any report
+table going forward.
+
+**phi4_mini F3 rescored in place** (no rerun needed -- deterministic,
+same raw outputs, just reparsed): 4 diffs total (2 `synthetic`, 0
+`bfcl_simple`, 2 `bfcl_multiple`), all `None -> correctly parsed`, same
+`function_name_alias`/combined-`parameters_alias` mechanism as
+granite30. Applied directly to `results_v2/F3/phi4_mini/*/
+parsed_results.jsonl` and `summary.json` (raw_outputs.jsonl untouched).
+New parse rates: `synthetic` 0.295 -> 0.298, `bfcl_simple` 0.212
+(unchanged), `bfcl_multiple` 0.158 -> 0.162. Greedy-trial (trial_index
+0) baseline accuracy unaffected on phi4_mini (all 4 diffs were sampled
+trials); granite30's greedy accuracy did shift (`synthetic` 0.88 ->
+0.90, `bfcl_multiple` 0.41 -> 0.42) since some of its 28 diffs land on
+trial_index 0.
+
+**D, F1, F2 rescored for comparison** (99 run directories: D's 48,
+F1's 48, F2's 3) -- **zero diffs everywhere**, confirmed directly, not
+assumed. Expected: all three use `prompt_format: shared`, whose prompt
+explicitly instructs `{"name": ..., "arguments": {...}}`, so the
+native-only `"function"`/`"type"` shapes this fix targets essentially
+never occur there. Confirms the fix's blast radius is confined to F3's
+native-template output, as designed.
+
+**15-sample check on F3_rerun/granite30's remaining
+`unrecognized_format` failures** (random sample, seed 42, 159 eligible
+failures after the fix): 11/15 are correctly left unparsed -- prose
+that states an intended tool call with the tool name only in free
+text, never inside any JSON-like structure, plus one case where the
+model fabricates a fake tool *response* rather than attempting a call.
+**2/15 are unambiguous correct tool calls the parser still misses**,
+using a third, different key convention: `{"tool": "<name>",
+"arguments": {...}}`. **2/15 more are borderline**: Python
+function-call syntax (e.g. `get_stock_price({"ticker": "GLOB"})`) --
+unambiguous intent but not JSON, and consistent with this session's
+established treatment of Python-syntax output elsewhere (phi4_mini's
+F3 quick-test finding, 2026-10-06) as model non-compliance, not a
+parser gap -- not counted as a parser miss.
+
+**Decision (per explicit instruction: stop and fix again only if more
+than 2/15 are correct calls)**: counted 2/15 using the `"tool"`-key
+convention -- at, not over, the threshold. **No further parser change
+will be made.** The `"tool"`-key gap is logged here as a known,
+deliberately unfixed residual (asked the user directly given the exact
+threshold and the Python-syntax ambiguity; decision confirmed: treat
+as 2/15, proceed, do not extend the parser). This fix is closed.
+
+**This fix was found and justified entirely from parse rates and
+direct raw-output inspection -- never from any upgrade-verdict or
+pair-difference computation** (none has been computed anywhere in this
+project to date, per standing instruction). No more parser changes
+will be made beyond what is logged in this entry and the one below it.
+
 ## 2026-10-07 — Granite-3.0's F3 parse rate: real parser gap found and fixed
 
 Granite-3.0's full-run F3 parse rate (0.68-0.87) was notably lower than
