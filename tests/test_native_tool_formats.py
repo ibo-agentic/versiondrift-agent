@@ -49,6 +49,20 @@ LLAMA31_EXAMPLE = '<|python_tag|>{"name": "get_weather", "parameters": {"city": 
 # --- Untagged list-wrapped (no specific family claimed) ---------------------
 LIST_WRAPPED_EXAMPLE = '[{"name": "get_weather", "arguments": {"city": "Paris"}}]'
 
+# --- Granite-3.0: OpenAI-flavored hybrid, tool name as a bare string ------
+# 2026-10-07, found in real F3 run data (results_v2/F3/granite30/), not
+# invented: Granite-3.0 has no explicit in-prompt instruction for its
+# tool-call format at all (confirmed by reading its chat_template
+# directly -- the tools list is dumped with no accompanying natural-
+# language instruction on how to respond), and sometimes drifts to this
+# shape instead of its own <|tool_call|> convention. Deliberately
+# distinct from true OpenAI format (where "function" is a nested OBJECT
+# with its own "name" key) -- here "function" is a plain string, the
+# tool name directly.
+GRANITE30_FUNCTION_STRING_EXAMPLE = (
+    '{"type": "function", "function": "get_weather", "arguments": {"city": "Paris"}}'
+)
+
 EXPECTED_CALL = {"name": "get_weather", "arguments": {"city": "Paris"}}
 
 
@@ -90,6 +104,29 @@ def test_llama31_parameters_alias_format():
     call, fmt = extract_tool_call_with_format(LLAMA31_EXAMPLE)
     assert call == EXPECTED_CALL  # normalized to "arguments" internally
     assert fmt == "parameters_alias"
+
+
+def test_granite30_function_as_string_alias_format():
+    call, fmt = extract_tool_call_with_format(GRANITE30_FUNCTION_STRING_EXAMPLE)
+    assert call == EXPECTED_CALL  # "function" (string) normalized to "name"
+    assert fmt == "function_name_alias"
+
+
+def test_function_as_nested_object_still_parses_but_not_via_the_new_alias():
+    # The real OpenAI shape ("function" is a nested object with its own
+    # "name" inside, not a bare string) must NOT trigger the new
+    # Granite-3.0 alias (obj.get("function") is a dict there, not a
+    # string, so the alias check correctly skips it) -- but it still
+    # parses successfully, because _call_candidates() scans for a JSON
+    # object/array starting at EVERY "{"/"[" in the text, including
+    # nested ones, and the inner {"name": ..., "arguments": ...} object
+    # matches the plain canonical shape on its own. Confirms the new
+    # alias doesn't duplicate-handle or interfere with this pre-existing
+    # (already-correct) behavior.
+    raw = '{"type": "function", "function": {"name": "get_weather", "arguments": {"city": "Paris"}}}'
+    call, fmt = extract_tool_call_with_format(raw)
+    assert call == EXPECTED_CALL
+    assert fmt == "bare_json"  # via the inner nested object, not the alias
 
 
 def test_untagged_list_wrapped_format():

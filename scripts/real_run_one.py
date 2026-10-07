@@ -38,6 +38,11 @@ PROTOCOL_THINKING = {
     "F2": "off",
     "F1": "default",
     "F3": "default",
+    # F3_rerun: granite30 only, after the 2026-10-07 parser fix (Granite-
+    # 3.0's "function"-as-string-alias) -- identical config to F3 in
+    # every way, written to a separate folder so the original F3 data
+    # is kept untouched. See DEVIATIONS.md.
+    "F3_rerun": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -45,6 +50,7 @@ PROTOCOL_MAX_TOKENS = {
     "F2": 256,
     "F1": 1024,
     "F3": 256,
+    "F3_rerun": 256,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -54,6 +60,7 @@ PROTOCOL_PROMPT_FORMAT = {
     "F2": "shared",
     "F1": "shared",
     "F3": "native",
+    "F3_rerun": "native",
 }
 
 

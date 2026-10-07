@@ -4,6 +4,77 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-07 — Granite-3.0's F3 parse rate: real parser gap found and fixed
+
+Granite-3.0's full-run F3 parse rate (0.68-0.87) was notably lower than
+Granite-3.1/3.2's (near-100%) and not explained by the 2026-10-06
+investigation (which only quick-tested Granite-3.1). Investigated
+directly against the real run data in `results_v2/F3/granite30/`.
+
+**Classified every failed parse (447 total across 3 suites) into four
+buckets**: `no_tool_call` (219: pure prose, no JSON-like structure at
+all), `unrecognized_format` (187: some JSON structure present, but not
+a shape the parser accepted), `truncation` (41: `truncated=True`), and
+`invalid_json_in_tag` (0: never happened -- no case of a recognized tag
+with unparseable content inside).
+
+**Granite-3.0's native template was checked directly** (its embedded
+`chat_template`, not assumed): it gives **no explicit natural-language
+instruction** for the tool-call format at all -- the tools list is
+rendered under `<|start_of_role|>available_tools<|end_of_role|>` with
+no accompanying text telling the model how to respond. The
+`<|tool_call|>` convention exists only as a template-rendering rule for
+*prior-turn history* (the `assistant_tool_call` message role), never as
+an in-context instruction for the *current* turn. This likely explains
+why the model sometimes drifts to a different, OpenAI-flavored shape
+instead.
+
+**Within `unrecognized_format`, 12/447 (2.7%) matched one specific,
+unambiguous shape**: `{"type": "function", "function": "<name>",
+"arguments": {...}}` -- the tool name as a bare JSON string under
+`"function"` instead of under `"name"`. Inspected 5 raw outputs
+directly (mix of this shape and genuinely ambiguous ones): for every
+example of this specific shape, a reasonable human reading it would
+call it a correct, complete tool call (e.g. `{"type": "function",
+"function": "get_weather", "arguments": {"city": "Phoenix", "unit":
+"celsius"}}` unambiguously calls `get_weather(city="Phoenix",
+unit="celsius")`). **This is a parser bug**, not model behavior: the
+parser's `_normalize()` only recognized the tool name under `"name"`,
+with no alias for this (real, observed) convention.
+
+**Fix** (`upgradecanary/parsing.py`): `_normalize()` now also accepts
+`"function"` as a name alias *only* when its value is a plain string
+(deliberately distinct from true OpenAI format, where `"function"` is
+a nested object with its own `"name"` inside -- that shape was already
+parseable before this fix too, via the existing nested-object scan in
+`_call_candidates()`, confirmed by a dedicated test). Labeled
+`"function_name_alias"` in `detected_format`, consistent with this
+project's existing per-alias labeling convention. Two new tests added
+in `tests/test_native_tool_formats.py`.
+
+**Rescored all other 7 native-template models' existing F3 raw outputs**
+with the fixed parser (not re-run, just re-parsed) to check for
+regressions: 6 of 7 (llama31, qwen25, mistral_v03, granite31, granite32,
+qwen3) show **zero changes** across all 1800 tool-call-condition records
+each. **phi4_mini shows 4 changes** (2 on `synthetic`, 2 on
+`bfcl_multiple`, out of 1800 each) -- inspected all 4 directly: every
+one is a `None -> successfully parsed` flip (never an already-correct
+parse changing value), and every one uses the *same* hybrid shape
+Granite-3.0 does (`"function"` as a string, sometimes combined with the
+pre-existing `"parameters"` alias too). This is a genuine improvement
+for phi4_mini, not a regression, but it is a real change and is
+reported as such rather than claimed as "zero impact."
+
+**Rerun**: `granite30` x 3 suites under F3 only, written to
+`results_v2/F3_rerun/granite30/` (the original `results_v2/F3/
+granite30/` data is kept, untouched). Parse rate improved modestly,
+consistent with the fix recovering only the 2.7% `function_name_alias`
+subset: synthetic 0.873 -> 0.890, bfcl_simple 0.702 -> 0.717,
+bfcl_multiple 0.680 -> 0.695. The bulk of Granite-3.0's F3 failures
+remain genuine model non-compliance (prose with no structured call, or
+a structure with no recoverable name field at all) -- not touched by
+this fix, and not a parser gap.
+
 ## 2026-10-06 — F3 native-template parse rates: root causes found, no harness changes
 
 **Phi-4-mini**: F3's quick test (5 tasks/suite) showed 0-37% parse rate,

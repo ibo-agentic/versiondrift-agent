@@ -135,9 +135,9 @@ def extract_tool_call_with_format(
 
 def _extract_with_shape(raw: str) -> tuple[dict[str, Any] | None, str | None]:
     for candidate, base_shape in _call_candidates(raw):
-        call, used_parameters_alias = _normalize(candidate)
+        call, alias_shape = _normalize(candidate)
         if call is not None:
-            shape = "parameters_alias" if used_parameters_alias else base_shape
+            shape = alias_shape if alias_shape else base_shape
             return call, shape
     return None, None
 
@@ -165,19 +165,34 @@ def _call_candidates(raw: str):
             yield obj[0], "list_wrapped"
 
 
-def _normalize(obj: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
-    """Returns (call, used_parameters_alias)."""
+def _normalize(obj: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    """Returns (call, alias_shape) -- alias_shape is None for the
+    canonical {"name", "arguments"} shape, else a label for whichever
+    recognized alias convention matched."""
     if "tool_call" in obj and isinstance(obj["tool_call"], dict):
         return _normalize(obj["tool_call"])
     name = obj.get("name")
+    function_name_alias = False
+    # Granite-3.0 (2026-10-07, found in real F3 run data, confirmed
+    # unambiguous -- a reasonable human reading it would call it a
+    # correct, complete tool call): sometimes emits an OpenAI-flavored
+    # hybrid shape with the tool name as a bare STRING under "function"
+    # instead of "name" -- {"type": "function", "function": "<name>",
+    # "arguments": {...}}. Deliberately distinct from true OpenAI format
+    # (where "function" is a nested OBJECT with its own "name" inside) --
+    # only treated as a name alias when "function" is a plain string, so
+    # this cannot misfire on an actual nested-object shape.
+    if name is None and isinstance(obj.get("function"), str):
+        name = obj["function"]
+        function_name_alias = True
     arguments = obj.get("arguments")
     if isinstance(name, str) and isinstance(arguments, dict):
-        return {"name": name, "arguments": arguments}, False
+        return {"name": name, "arguments": arguments}, ("function_name_alias" if function_name_alias else None)
     # Llama 3.1 style: "parameters" instead of "arguments".
     parameters = obj.get("parameters")
     if isinstance(name, str) and isinstance(parameters, dict):
-        return {"name": name, "arguments": parameters}, True
-    return None, False
+        return {"name": name, "arguments": parameters}, "parameters_alias"
+    return None, None
 
 
 _FAULT_REPORT_STATUSES = {"ok", "failed", "incomplete"}
