@@ -4,6 +4,20 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-08 — Analysis conventions fixed before any verdict is computed
+
+Set here, before any pair difference exists, so none is chosen after seeing results. Implemented in `configs/analysis_official_folders.yaml` and `vdanalysis/` on branch `analysis-prep`.
+
+- **Stress diff.** PLAN.md section 4 says "the stress conditions, as in the existing pipeline" without listing them; the old pipeline used schema_drift + runtime_fault, and runtime_fault is not rerun (section 3). Decision: the stress conditions are **schema_drift + fault_reporting**, and the stress diff is the **average of the two per-condition paired diffs, equal weight per condition** (not a pooled record mean). The CI gate's cluster bootstrap resamples tasks and recomputes that same average (10,000 reps, seed 1234). Baseline is never part of the stress diff.
+- **F6.** Main number: only pairs where at least one model's sampling changed (qwen2, qwen25, qwen3, llama3, llama31, gemma3_4b). All pairs also reported.
+- **F3.** F3 ran on the 8 models with a native tool template (llama31, qwen25, mistral_v03, granite30, granite31, granite32, qwen3, phi4_mini; the F3 orchestrator's `NATIVE_TEMPLATE_MODELS`). **F3 main flip count = both-native pairs only: qwen25->qwen3, granite30->granite31, granite31->granite32, i.e. 9 decisions (small).** All pairs where at least one model ran F3 are also reported, as a mixed comparison (native new vs shared-prompt old, so two things differ). Official data: granite30 from `results_v2/F3_rerun/`; phi4_mini from the rescored `results_v2/F3/`; `results_v2/F3/granite30/` is audit-only and the analysis loader refuses it.
+- **F4.** Generic JSON only. Qwen3 under F4 and under R is labeled "grammar + thinking blocked", excluded from the main F4 number, reported as its own variant, and compared with Qwen3 F2 (F2−D thinking only, F4−D both, F4−F2 grammar only).
+- **H4.** Computed for each nuisance factor (F3, F5, F6) separately and pooled; D is read with the point gate, R with the CI gate. **Primary = any held-out pair where that factor changed at least one model** (so for F3 this includes mixed pairs); the same test on all held-out pairs is also reported, and for F3 a both-native variant is also reported.
+- **Size-changing pairs** (qwen25->qwen3, gemma2_2b->gemma3_4b) are tagged and reported separately everywhere.
+- **Controls (PLAN.md section 6).** A/A (R vs R_AA): design mistral_v02, qwen2, qwen25; held-out llama31, phi35_mini, granite31 (3 + 3). Positive controls (Q2_K and no-description): mistral_v03, qwen25, llama31, granite32.
+- **Folder names** assumed for F5 and R: F5, R, R_F3, R_F5, R_F6, R_unconstrained, R_AA, R_PC_Q2K, R_PC_NODESC.
+- **Parser.** The Granite-3.0 `"tool"`-key gap stays unfixed in strict parsing; F7 lenient parsing repairs invalid backslash escapes only.
+
 ## 2026-10-08 — F4/R: Qwen3's generic-JSON grammar also blocks thinking
 
 Confirmed directly (ran a real Qwen3 generation with and without the
