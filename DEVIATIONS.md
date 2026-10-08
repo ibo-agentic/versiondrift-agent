@@ -4,6 +4,23 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-08 — F6 complete: 1 greedy mismatch, pre-existing GPU nondeterminism
+
+All 48 F6 runs completed (11.4 hours). The greedy-record check (every
+trial-0 record vs. D's matching record, 14,400 total) found **1
+mismatch**: `qwen3/bfcl_simple`, task `bfcl-simple_python_279`,
+`schema_drift` condition -- same prompt, same temperature (0.0) and
+seed (1234) in both, byte-identical for most of the (truncated)
+`<think>` block, then diverging into two different continuations.
+Consistent with this project's own documented caveat (`README.md`:
+"llama.cpp seeding is best-effort on GPU"), not caused by F6's
+per-trial sampling mechanism (the other 14,399 greedy records all
+matched exactly, confirming the mechanism correctly pins greedy to D's
+own sampling values). Logged here per instruction ("report any
+mismatch"); full detail in `analysis/plan/F6_report.md`. No harness
+change made -- this is a pre-existing GPU-determinism property of the
+backend, not something F6 introduced.
+
 ## 2026-10-07 — F6 (sampling preset): per-trial overrides added, table + plan before running
 
 **Applied values table** (sampled trials 1/2 only; greedy, trial 0, always
