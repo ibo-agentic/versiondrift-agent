@@ -7,6 +7,8 @@
 results_root: ../results_v2        # where D, F1..F6, F11, R... runs live
 rescored_root: ../rescored         # where scripts/rescore_f7/f8/f10 write (NOT results*/)
 expected_records_per_run: 900      # 100 tasks x 3 conditions x 3 trials
+# UNCONFIRMED: PLAN.md section 4 says only "over the stress conditions, as in the existing pipeline"
+# (the existing pipeline used schema_drift + runtime_fault). fault_reporting replacing runtime_fault is an inference.
 stress_conditions: [schema_drift, fault_reporting]
 baseline_condition: baseline
 gate: {threshold: 0.05, reps: 10000, seed: 1234}   # PLAN.md sections 4 and 8
@@ -61,7 +63,9 @@ protocols:
   D:  {folder: D,  expect_manifest: {F1_max_tokens: 256}}
   F1: {folder: F1, expect_manifest: {F1_max_tokens: 1024}}
   F2: {folder: F2, models: [qwen3], expect_manifest: {F2_thinking: "off"}}
-  F3: {folder: F3, expect_manifest: {F3_prompt_format: native}}
+  # F3 ran only on the 8 models that have a native tool template.
+  F3: {folder: F3, expect_manifest: {F3_prompt_format: native},
+       models: [llama31, qwen25, mistral_v03, granite30, granite31, granite32, qwen3, phi4_mini]}
   # DEVIATIONS.md F4: generic JSON only (full_schema was cut). Qwen3 gets
   # grammar AND blocked thinking -> labeled, reported separately.
   F4_json:
@@ -105,10 +109,10 @@ audit_only_folders:
 factors:
   F1:  {protocol: F1, level: "max_tokens=1024"}
   F2:  {protocol: F2, level: "thinking off (Qwen3 only)"}
-  F3:  {protocol: F3, level: "native tool template"}
+  F3:  {protocol: F3, level: "native tool template", main_min_changed: 2}   # main = both models have a native template
   F4:  {protocol: F4_json, level: "generic JSON grammar"}
   F5:  {protocol: F5, level: "Q8_0"}
-  F6:  {protocol: F6, level: "recommended sampling", main_filter: f6_sampling_changed}
+  F6:  {protocol: F6, level: "recommended sampling", main_min_changed: 1, changed_models: [qwen2, qwen25, qwen3, llama3, llama31, gemma3_4b]}
   F7:  {protocol: F7, level: "lenient parsing (escape repair)"}
   F8:  {protocol: F8, level: "relaxed intent (5 causes)"}
   F9:  {kind: gate, level: "CI gate"}
@@ -130,11 +134,13 @@ robust:
 # DEVIATIONS.md F4: Qwen3 F4 vs F2 comparison
 qwen3_study: {model: qwen3, thinking_off: F2, grammar: F4_json, label: grammar+thinking_blocked}
 
-# ---- controls (PLAN.md section 6). EDIT model lists to what was actually run ----
+# ---- controls (PLAN.md section 6), model lists as decided by the user ----
+# A/A: 2 design (mistral_v02, qwen25) + 4 held-out; PLAN.md asks 3 + 3 -- see README.
+# Positive controls: run under both damage types.
 controls:
   - {name: AA_R, kind: aa, protocol_a: R, protocol_b: R_AA, gate: ci, h5: true,
-     models: [mistral_v02, qwen25, qwen3, llama31, phi4_mini, granite31]}
+     models: [mistral_v02, qwen25, llama31, phi35_mini, granite31, gemma3_4b]}
   - {name: PC_Q2K_R, kind: pc, protocol_a: R, protocol_b: R_PC_Q2K, gate: ci, h5: true,
-     models: [mistral_v02, qwen25, llama31, granite31]}
+     models: [mistral_v03, qwen25, llama31, granite32]}
   - {name: PC_NODESC_R, kind: pc, protocol_a: R, protocol_b: R_PC_NODESC, gate: ci, h5: true,
-     models: [mistral_v02, qwen25, llama31, granite31]}
+     models: [mistral_v03, qwen25, llama31, granite32]}

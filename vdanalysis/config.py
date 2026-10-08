@@ -73,6 +73,23 @@ class Config:
     def f6_changed(self, p: dict) -> bool:
         return p["old"] in self.sampling_changed or p["new"] in self.sampling_changed
 
+    def changed_models(self, factor: str) -> set[str] | None:
+        """Models whose setup actually differs from D under ``factor`` (None = all).
+        Explicit ``changed_models`` in the factor config wins, else the factor's
+        protocol ``models`` list, else all models."""
+        f = self.factors[factor]
+        if "changed_models" in f:
+            return set(f["changed_models"])
+        if f.get("kind", "run") == "run" and self.protocols[f["protocol"]].get("models"):
+            return set(self.protocols[f["protocol"]]["models"])
+        return None
+
+    def n_changed(self, factor: str, pair: dict) -> int:
+        ch = self.changed_models(factor)
+        if ch is None:
+            return 2
+        return int(pair["old"] in ch) + int(pair["new"] in ch)
+
     def protocol_models(self, protocol: str) -> list[str] | None:
         return self.protocols[protocol].get("models")
 

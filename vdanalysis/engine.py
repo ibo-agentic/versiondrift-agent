@@ -151,8 +151,10 @@ class Analysis:
                 delta = df - dd
                 from_fmt = -(frow["fmt_fail_change"] - d["fmt_fail_change"])
                 from_sem = -(frow["sem_fail_change"] - d["sem_fail_change"])
+                pair_cfg = next(x for x in self.cfg.pairs if self.cfg.pair_name(x) == d["pair"])
                 out.append({
                     "factor": fname,
+                    "n_models_changed": self.cfg.n_changed(fname, pair_cfg),
                     "level": f.get("level", ""),
                     "pair": d["pair"], "suite": d["suite"], "family": d["family"], "split": d["split"],
                     "size_changing": d["size_changing"],

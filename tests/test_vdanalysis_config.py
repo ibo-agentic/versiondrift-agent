@@ -57,3 +57,15 @@ def test_rescore_factors_write_outside_results_folders(cfg):
     for f in ("F7", "F8", "F10"):
         assert cfg.protocols[f]["root"] == "rescored"
     assert Path(cfg.raw["rescored_root"]).name not in {"results", "results_smoke", "results_v2"}
+
+
+def test_controls_and_f3_models_as_decided(cfg):
+    ctl = {c["name"]: c["models"] for c in cfg.controls}
+    assert ctl["AA_R"] == ["mistral_v02", "qwen25", "llama31", "phi35_mini", "granite31", "gemma3_4b"]
+    assert ctl["PC_Q2K_R"] == ctl["PC_NODESC_R"] == ["mistral_v03", "qwen25", "llama31", "granite32"]
+    assert cfg.changed_models("F3") == {"llama31", "qwen25", "mistral_v03", "granite30", "granite31",
+                                        "granite32", "qwen3", "phi4_mini"}
+    both = [cfg.pair_name(p) for p in cfg.pairs if cfg.n_changed("F3", p) == 2]
+    assert both == ["qwen25->qwen3", "granite30->granite31", "granite31->granite32"]
+    assert [cfg.pair_name(p) for p in cfg.pairs if cfg.n_changed("F6", p) >= 1] == [
+        "qwen2->qwen25", "qwen25->qwen3", "llama3->llama31", "gemma2_2b->gemma3_4b"]

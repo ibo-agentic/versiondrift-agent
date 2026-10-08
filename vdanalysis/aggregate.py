@@ -4,7 +4,7 @@ Reporting conventions fixed in DEVIATIONS.md (all applied by the ``main``
 variant; the ``all`` variant is always reported next to it):
 
 * F6: main number uses only pairs where a model's sampling actually
-  changed (factor config ``main_filter: f6_sampling_changed``).
+  changed (factor config ``main_min_changed``).
 * F4 / R: any decision where a Qwen3 run used the generic-JSON grammar
   carries the label "grammar+thinking_blocked" (two things changed, not
   one); those cells are excluded from the main F4 number and reported as
@@ -27,10 +27,13 @@ SIZE_SUBSETS = {
 
 
 def _variant_filters(cfg: Config, factor: str, flips: list[dict]):
-    main_filter = cfg.factors[factor].get("main_filter")
+    # DEVIATIONS.md conventions: main number counts only pairs where the factor
+    # actually changed >= main_min_changed of the two models (F6: 1 = sampling
+    # changed for at least one; F3: 2 = both have a native template).
+    min_changed = int(cfg.factors[factor].get("main_min_changed", 0))
 
     def main(r):
-        return not r["confounding"] and (not main_filter or bool(r[main_filter]))
+        return not r["confounding"] and r["n_models_changed"] >= min_changed
 
     variants = {"main": main, "all": lambda r: True}
     if any(r["confounding"] for r in flips):
@@ -145,27 +148,46 @@ def hypotheses(cfg: Config, analysis: Analysis, flips: list[dict], control_summa
             n_decisions=n_dec, value=med_f, comparison_value=med_n,
             n_flipped=len(flipped_keys), comparison_n=n_dec - len(flipped_keys))
 
-    # H4 (held-out pairs; D vs R across the nuisance set)
+    # H4: for each nuisance factor, primary = held-out pairs where that factor
+    # changed >= 1 model; also all held-out pairs. Per factor: D vs D+factor
+    # (point gate) against R vs R+factor (CI gate).
     robust = cfg.robust
     nuis = cfg.groups.get("nuisance", [])
     if robust.get("base"):
-        d_alts = {f: cfg.factors[f]["protocol"] for f in nuis}
         r_alts = dict(robust.get("nuisance", {}))
-        variants = {
-            "primary/held_out": lambda r: r["split"] == "held-out",
-            "held_out_sampling_changed_only": lambda r: r["split"] == "held-out" and r["f6_sampling_changed"],
-            "held_out_size_preserving": lambda r: r["split"] == "held-out" and not r["size_changing"],
-        }
-        for vname, restrict in variants.items():
-            dd = disagreement(analysis, cfg.base_protocol, d_alts, "point", restrict)
-            rd = disagreement(analysis, robust["base"], r_alts, "ci", restrict)
-            ok = None
-            if dd["disagreement_rate"] is not None and rd["disagreement_rate"] is not None:
-                ok = rd["disagreement_rate"] < dd["disagreement_rate"]
-            add("H4", vname, "R disagrees less than D across nuisance set {F3,F5,F6} on held-out pairs",
-                ok, n_decisions=rd["n_decisions"], value=rd["disagreement_rate"],
-                comparison_value=dd["disagreement_rate"], n_flipped=rd["n_disagree"],
-                comparison_n=dd["n_decisions"], comparison_n_flipped=dd["n_disagree"])
+        tot = {"primary": [0, 0, 0, 0], "all_held_out": [0, 0, 0, 0]}
+        for f in nuis:
+            if f not in r_alts:
+                continue
+
+            def changed_pairs(row, f=f):
+                pair = next(x for x in cfg.pairs if cfg.pair_name(x) == row["pair"])
+                return cfg.n_changed(f, pair)
+
+            variants = {
+                "primary": lambda r, cp=changed_pairs: r["split"] == "held-out" and cp(r) >= 1,
+                "all_held_out": lambda r: r["split"] == "held-out",
+            }
+            if f == "F3":
+                variants["both_native"] = lambda r, cp=changed_pairs: r["split"] == "held-out" and cp(r) == 2
+            for vname, restrict in variants.items():
+                dd = disagreement(analysis, cfg.base_protocol, {f: cfg.factors[f]["protocol"]}, "point", restrict)
+                rd = disagreement(analysis, robust["base"], {f: r_alts[f]}, "ci", restrict)
+                if vname in tot:
+                    for i, v in enumerate((rd["n_disagree"], rd["n_decisions"], dd["n_disagree"], dd["n_decisions"])):
+                        tot[vname][i] += v
+                ok = None
+                if dd["disagreement_rate"] is not None and rd["disagreement_rate"] is not None:
+                    ok = rd["disagreement_rate"] < dd["disagreement_rate"]
+                add("H4", f"{f}/{vname}", f"R disagrees less than D under {f} (held-out pairs)",
+                    ok, n_decisions=rd["n_decisions"], value=rd["disagreement_rate"],
+                    comparison_value=dd["disagreement_rate"], n_flipped=rd["n_disagree"],
+                    comparison_n=dd["n_decisions"], comparison_n_flipped=dd["n_disagree"])
+        for vname, (rk, rn, dk, dn) in tot.items():
+            ok = (rk / rn < dk / dn) if rn and dn else None
+            add("H4", f"pooled/{vname}", "R disagrees less than D, pooled over F3,F5,F6 (held-out pairs)",
+                ok, n_decisions=rn, value=(rk / rn) if rn else None, comparison_value=(dk / dn) if dn else None,
+                n_flipped=rk, comparison_n=dn, comparison_n_flipped=dk)
 
     # H5
     fa = control_summary.get("false_alarm_rate")

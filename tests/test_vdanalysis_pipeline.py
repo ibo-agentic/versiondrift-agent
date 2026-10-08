@@ -151,7 +151,7 @@ def test_h1_supported_8_of_14(study):
 
 def test_h2_not_supported_when_other_factors_flip_more(study):
     r = hyp(study, "H2", "main/all_pairs")
-    assert r["value"] == pytest.approx(2 / 28) and r["comparison_value"] == pytest.approx(4 / 30)
+    assert r["value"] == pytest.approx(2 / 28) and r["comparison_value"] == pytest.approx(4 / 20)
     assert r["supported"] is False
 
 
@@ -162,11 +162,30 @@ def test_h3_median_comparison(study):
     assert r["supported"] is True
 
 
-def test_h4_r_disagrees_less_than_d_on_held_out(study):
-    r = hyp(study, "H4", "primary/held_out")
-    assert r["comparison_value"] == pytest.approx(2 / 6) and r["value"] == 0.0
-    assert r["supported"] is True
-    assert hyp(study, "H4", "held_out_sampling_changed_only")["supported"] is None  # no such decisions
+def test_h4_per_factor_primary_uses_only_pairs_where_factor_changed(study):
+    # held-out pairs: n, b, q (x2 suites). R is clean everywhere -> 0 disagreement.
+    f3 = hyp(study, "H4", "F3/primary")   # F3 changed models n_old,n_new,b_old,b_new -> pairs n,b
+    assert (f3["n_decisions"], f3["comparison_n_flipped"], f3["supported"]) == (4, 2, True)
+    assert f3["value"] == 0.0 and f3["comparison_value"] == pytest.approx(0.5)
+    assert hyp(study, "H4", "F3/all_held_out")["n_decisions"] == 6     # q pair included
+    assert hyp(study, "H4", "F3/both_native")["n_decisions"] == 4
+    f5 = hyp(study, "H4", "F5/primary")
+    assert f5["n_decisions"] == 6 and f5["comparison_n_flipped"] == 0 and f5["supported"] is False  # 0 < 0 is False
+    f6 = hyp(study, "H4", "F6/primary")   # only s_new changed; the s pair is design, not held-out
+    assert f6["n_decisions"] == 0 and f6["supported"] is None
+    assert hyp(study, "H4", "F6/all_held_out")["n_decisions"] == 6
+
+
+def test_h4_pooled(study):
+    p = hyp(study, "H4", "pooled/primary")
+    assert (p["n_decisions"], p["comparison_n_flipped"], p["n_flipped"], p["supported"]) == (10, 2, 0, True)
+
+
+def test_f3_main_flip_count_needs_both_models_native(study):
+    cfg, an, _, _ = study
+    rates = {(r["variant"], r["pair_subset"]): r for r in flip_rates(cfg, an.flip_table()) if r["factor"] == "F3"}
+    assert rates[("main", "all_pairs")]["n_decisions"] == 4      # n and b pairs (x2 suites)
+    assert rates[("all", "all_pairs")]["n_decisions"] == 6       # plus h (only h_new native)
 
 
 def test_h5_not_supported_with_a_false_alarm(study):

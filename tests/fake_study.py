@@ -61,7 +61,7 @@ def fake_config_dict(root: Path, rescored_root: Path | None = None) -> dict:
         "D": {"folder": "D"},
         "F1": {"folder": "F1", "expect_manifest": {"F1_max_tokens": 1024}},
         "F2": {"folder": "F2", "models": ["q_new"]},
-        "F3": {"folder": "F3"},
+        "F3": {"folder": "F3", "models": ["n_old", "n_new", "b_old", "b_new", "h_new"]},
         "F4_json": {"folder": "F4_json", "confounded_models": {"q_new": "grammar+thinking_blocked"}},
         "F5": {"folder": "F5"},
         "F6": {"folder": "F6"},
@@ -90,10 +90,10 @@ def fake_config_dict(root: Path, rescored_root: Path | None = None) -> dict:
         "factors": {
             "F1": {"protocol": "F1", "level": "1024"},
             "F2": {"protocol": "F2", "level": "thinking off"},
-            "F3": {"protocol": "F3", "level": "native"},
+            "F3": {"protocol": "F3", "level": "native", "main_min_changed": 2},
             "F4": {"protocol": "F4_json", "level": "generic json"},
             "F5": {"protocol": "F5", "level": "q8"},
-            "F6": {"protocol": "F6", "level": "recommended", "main_filter": "f6_sampling_changed"},
+            "F6": {"protocol": "F6", "level": "recommended", "main_min_changed": 1, "changed_models": ["s_new"]},
             "F9": {"kind": "gate", "level": "CI gate"},
         },
         "factor_groups": {

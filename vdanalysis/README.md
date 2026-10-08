@@ -29,7 +29,9 @@ Tests (fake data only): `python -m pytest tests/test_vdanalysis_*.py`. The full 
 - `audit_only_folders`: `F3/granite30` (pre-fix original). The loader refuses it.
 - `sampling_changed_models`: the six models for the F6 main number.
 - `confounded_models` on `F4_json` and the `R*` protocols: Qwen3 gets the label `grammar+thinking_blocked`.
-- `robust`, `controls`, `F5` and `R*` folder names and the control model lists are **assumptions**. Edit them to match what was actually run.
+- `F5` and `R*` folder names are the agreed standard. Control model lists are as decided (A/A has 2 design + 4 held-out models, not PLAN.md's 3 + 3).
+- `stress_conditions` is **unconfirmed**: PLAN.md section 4 never lists them. See `analysis/DEVIATIONS_DRAFT_analysis_rules.md`.
+- `main_min_changed` / `changed_models` per factor drive the F3 (both models native) and F6 (at least one sampling change) main numbers and H4's per-factor primary number.
 
 Run layout expected: `<root>/<folder>/<model>/<suite>/<run_id>/parsed_results.jsonl` (+ `run_manifest.json`, optional `raw_outputs.jsonl`). Exactly one run directory per suite folder.
 
@@ -62,4 +64,4 @@ Records are paired on (task_id, condition, drift type, fault type, trial_index).
 | `robust_protocol_checks.csv` | R truncation flag (>2%), clean-ceiling flag, unconstrained-run format-failure rate |
 | `run_warnings.json` | record-count or manifest mismatches, missing runs |
 
-H-test definitions: H1 = share of the D decisions that flip under >= 1 level of F1-F10 (>= 20%). H2 = pooled flip rate of {F1,F2,F4,F7} vs {F3,F5,F6,F8}. H3 = median |D stress diff|, flipping vs never-flipping decisions. H4 = disagreement across {F3,F5,F6}, R (CI gate) vs D (point gate), held-out pairs. H5 = A/A false-alarm <= 5% and positive-control detection >= 90% under R. H1-H3 are reported for all pairs and for `size_preserving` / `size_changing`. H4 is reported on all held-out decisions (primary) and on the sampling-changed held-out pairs only.
+H-test definitions: H1 = share of the D decisions that flip under >= 1 level of F1-F10 (>= 20%). H2 = pooled flip rate of {F1,F2,F4,F7} vs {F3,F5,F6,F8}. H3 = median |D stress diff|, flipping vs never-flipping decisions. H4 = disagreement, R (CI gate) vs D (point gate), per factor F3/F5/F6 and pooled; primary = held-out pairs where that factor changed >= 1 model, also all held-out pairs. H5 = A/A false-alarm <= 5% and positive-control detection >= 90% under R. H1-H3 are reported for all pairs and for `size_preserving` / `size_changing`. 
