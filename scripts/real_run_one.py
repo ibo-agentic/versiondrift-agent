@@ -46,6 +46,11 @@ PROTOCOL_THINKING = {
     # F6 (sampling preset): thinking stays "default" (on) for Qwen3, same
     # as D -- only the sampling preset changes under this protocol.
     "F6": "default",
+    # F4_json (generic-JSON constrained decoding): thinking config itself
+    # stays "default" (unchanged from D) -- Qwen3's thinking is blocked as
+    # a structural SIDE EFFECT of the grammar (the config never turns it
+    # off), labeled and reported separately. See DEVIATIONS.md.
+    "F4_json": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -55,6 +60,7 @@ PROTOCOL_MAX_TOKENS = {
     "F3": 256,
     "F3_rerun": 256,
     "F6": 256,
+    "F4_json": 256,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -66,6 +72,19 @@ PROTOCOL_PROMPT_FORMAT = {
     "F3": "native",
     "F3_rerun": "native",
     "F6": "shared",
+    "F4_json": "shared",
+}
+# protocol -> constrained_decoding override. F4's "generic_json" level is
+# the only one run (PLAN.md's "full_schema" level is deliberately cut --
+# see DEVIATIONS.md, 2026-10-08).
+PROTOCOL_CONSTRAINED_DECODING = {
+    "D": "off",
+    "F2": "off",
+    "F1": "off",
+    "F3": "off",
+    "F3_rerun": "off",
+    "F6": "off",
+    "F4_json": "generic_json",
 }
 
 # D's own shared sampling defaults (upgradecanary/model/llama_cpp_client.py's
@@ -105,6 +124,7 @@ def build_config(
     thinking = PROTOCOL_THINKING[protocol]
     max_tokens = PROTOCOL_MAX_TOKENS[protocol]
     prompt_format = PROTOCOL_PROMPT_FORMAT[protocol]
+    constrained_decoding = PROTOCOL_CONSTRAINED_DECODING[protocol]
     if output_dir is None:
         output_dir = f"results_v2/{protocol}/{model_key}/{suite}"
 
@@ -136,7 +156,7 @@ def build_config(
         "trial_seeds": [1234, 1235, 1236],
         **trial_sampling_extra,
         "prompt_format": prompt_format,
-        "constrained_decoding": "off",
+        "constrained_decoding": constrained_decoding,
         "model": {
             "provider": "llama_cpp",
             "path": gguf_path,

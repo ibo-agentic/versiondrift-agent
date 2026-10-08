@@ -4,6 +4,91 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-08 — F4/R: Qwen3's generic-JSON grammar also blocks thinking
+
+Confirmed directly (ran a real Qwen3 generation with and without the
+`generic_json` grammar, identical prompt/temperature/seed): the grammar
+forces the first emitted token to be `{`, so Qwen3's `<think>` block is
+not truncated or malformed, it is **never emitted at all** --
+`LlamaGrammar`'s constraint applies from the very first token, with no
+allowance for a free-form preamble. Decision (asked explicitly, given
+two real options -- leave as-is, or build a custom think-block-optional
+GBNF grammar for Qwen3 only): **leave as-is**, run Qwen3 under the same
+plain `generic_json` grammar as every other model. No per-model special
+case in the F4 code path.
+
+**Consequence, labeled explicitly so it isn't mixed into a clean
+single-factor reading**: for every other model, F4 changes exactly one
+thing from D (constrained decoding). **For Qwen3 specifically, F4
+changes two things**: the JSON grammar itself, AND (as a structural
+side effect of that grammar, not a separate config choice) thinking
+gets blocked -- the same behavioral effect F2 deliberately produced via
+`thinking: off`. Qwen3's F4 results will be reported separately with
+this label (e.g. "Qwen3/F4 -- grammar + thinking blocked") rather than
+folded into the other 15 models' "constrained decoding only" reading,
+and compared against F2 specifically to help separate how much of
+Qwen3's F4 effect is the grammar versus how much is the loss of
+thinking.
+
+**Protocol R** (PLAN.md section 7) also specifies generic-JSON
+constrained decoding for its decision score. The exact same mechanism
+applies: **Qwen3 under R will also have thinking blocked**, for the
+same reason, and should carry the same two-things-changed label when R
+is eventually run. Noting this now, before R exists, so it isn't
+rediscovered as a surprise later.
+
+**Quick test (5 tasks/suite, qwen3/mistral_v02/phi35_mini) -- grammar
+loop/whitespace check**: parse rate 1.000 for all 3 models (the
+grammar structurally guarantees valid JSON). **Truncation on the
+grammar-constrained conditions (`baseline`/`schema_drift`) was 0/270
+(0.000) for all 3 models** -- confirms the grammar does not cause
+endless whitespace or looping before `max_tokens`. All observed
+truncation was on `fault_reporting` (qwen3 26/45 = 0.578, phi35_mini
+15/45 = 0.333, mistral_v02 0/45 = 0.000) -- that condition is **not**
+grammar-constrained under any protocol (`runner.py` never passes
+`response_schema` to its `client.generate()` call, since
+`GENERIC_JSON_RESPONSE_SCHEMA`'s `{"name","arguments"}` shape doesn't
+match `fault_reporting`'s `{"status","answer"}` envelope), so this
+truncation is the same pre-existing unconstrained-rambling behavior
+already documented for phi35_mini under D/F1 (`F1_report.md`), not a
+new F4 effect. **Qwen3-specific check**: every one of its 90
+`baseline`/`schema_drift` raw outputs starts with `{` and contains
+zero occurrences of `<think>`/`</think>` anywhere in the text,
+including inside any JSON string value -- 0/90 violations, confirmed
+directly, not just inferred from the single example above.
+
+## 2026-10-08 — F6 flip-rate reporting convention (set before any analysis)
+
+F6 changed sampling for only 6 of 16 models (qwen2, qwen25, qwen3,
+llama3, llama31, gemma3_4b) -- the other 10 have no official
+recommendation and kept D's exact sampling values (confirmed directly:
+18,000/18,000 of their sampled-trial records are byte-identical to D's,
+zero mismatches). Any future F6 flip-rate analysis will be reported
+two ways: **(a) on pairs where at least one model's sampling actually
+changed (the 6 models above) -- this is the main F6 number**, and (b)
+on all 48 pairs, for reference. Reporting only (b) would dilute any
+real sampling effect with 10 models' worth of pairs that are
+structurally guaranteed to show nothing (not because sampling has no
+effect, but because sampling didn't change for them). Set here, before
+any analysis, so the convention isn't chosen after seeing results.
+
+## 2026-10-08 — F4 full-schema constrained decoding cut; generic-JSON only
+
+PLAN.md's F4 factor lists two constrained-decoding levels:
+`generic_json` (any valid JSON, no schema) and `full_schema` (the
+model's actual tool schema baked into the grammar). Only `generic_json`
+will be run. **Reasons**: (1) time -- a second full 48-run batch
+(`full_schema`) would roughly double F4's wall-clock cost on top of
+`generic_json`'s own ~48-run batch, and (2) `full_schema` changes what
+`schema_drift` measures: baking the (possibly drifted) schema directly
+into the decoding grammar would force every sampled token to already
+conform to that schema, which would mechanically inflate
+`args_valid_under_drift` regardless of the model's own drift-adaptation
+behavior -- the grammar, not the model, would be doing the adapting.
+`generic_json` (any valid JSON accepted, no schema steering) has no
+such confound and is the more informative of the two for this
+project's purposes.
+
 ## 2026-10-08 — F6 complete: 1 greedy mismatch, pre-existing GPU nondeterminism
 
 All 48 F6 runs completed (11.4 hours). The greedy-record check (every
