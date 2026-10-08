@@ -68,3 +68,21 @@ def test_ci_gate_needs_ci_clear_of_zero():
 def test_bootstrap_deterministic(seed):
     pt = [(-1.0, 6), (0.0, 6), (2.0, 6)]
     assert bootstrap_ci(pt, 500, seed) == bootstrap_ci(pt, 500, seed)
+
+
+def test_stress_diff_is_equal_weight_average_even_with_unequal_record_counts():
+    # schema_drift: 10 records, new loses 5 -> -0.5. fault_reporting: 2 records, new loses 0 -> 0.
+    # equal weight = -0.25 (pooled would be -5/12 = -0.4167).
+    keys = [(f"t{i}", "schema_drift", None, None, 0) for i in range(10)]
+    fk = [(f"t{i}", "fault_reporting", None, None, 0) for i in range(2)]
+    old = _run({k: 1 for k in keys + fk})
+    new = _run({k: (0 if k in keys[:5] else 1) for k in keys + fk})
+    c = compare(old, new, ["schema_drift", "fault_reporting"], 0.05, 200, 1234)
+    assert c.diff == pytest.approx(-0.25)
+    assert c.mean_old == 1.0 and c.mean_new == pytest.approx(0.75)
+
+
+def test_bootstrap_two_conditions_matches_single_when_identical():
+    pt = [(-1.0, 6), (0.0, 6), (2.0, 6), (-2.0, 6)]
+    two = [[x, x] for x in pt]
+    assert bootstrap_ci(two, 500, 1234) == bootstrap_ci(pt, 500, 1234)

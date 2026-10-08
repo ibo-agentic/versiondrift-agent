@@ -29,15 +29,15 @@ Tests (fake data only): `python -m pytest tests/test_vdanalysis_*.py`. The full 
 - `audit_only_folders`: `F3/granite30` (pre-fix original). The loader refuses it.
 - `sampling_changed_models`: the six models for the F6 main number.
 - `confounded_models` on `F4_json` and the `R*` protocols: Qwen3 gets the label `grammar+thinking_blocked`.
-- `F5` and `R*` folder names are the agreed standard. Control model lists are as decided (A/A has 2 design + 4 held-out models, not PLAN.md's 3 + 3).
-- `stress_conditions` is **unconfirmed**: PLAN.md section 4 never lists them. See `analysis/DEVIATIONS_DRAFT_analysis_rules.md`.
+- `F5` and `R*` folder names are the agreed standard. Control model lists are as decided (A/A: 3 design + 3 held-out).
+- `stress_conditions` = schema_drift + fault_reporting (confirmed); the stress diff is the equal-weight average of the two per-condition diffs.
 - `main_min_changed` / `changed_models` per factor drive the F3 (both models native) and F6 (at least one sampling change) main numbers and H4's per-factor primary number.
 
 Run layout expected: `<root>/<folder>/<model>/<suite>/<run_id>/parsed_results.jsonl` (+ `run_manifest.json`, optional `raw_outputs.jsonl`). Exactly one run directory per suite folder.
 
 ## Method in one paragraph
 
-Records are paired on (task_id, condition, drift type, fault type, trial_index). A decision is one adjacent pair x suite. Its stress diff is the mean paired success difference (new - old) over `schema_drift` + `fault_reporting`. Point gate: harmful if diff < -0.05, beneficial if > +0.05. CI gate: also needs the 95% task-cluster bootstrap CI (10,000 reps, seed 1234, same draws as `upgradecanary/gates.py`) clear of zero. A failure is a *format* failure if nothing parseable came out, else *semantic*.
+Records are paired on (task_id, condition, drift type, fault type, trial_index). A decision is one adjacent pair x suite. Its stress diff is the average of the `schema_drift` and `fault_reporting` mean paired success differences (new - old), equal weight per condition; the bootstrap resamples tasks and recomputes that same average. Point gate: harmful if diff < -0.05, beneficial if > +0.05. CI gate: also needs the 95% task-cluster bootstrap CI (10,000 reps, seed 1234, same draws as `upgradecanary/gates.py`) clear of zero. A failure is a *format* failure if nothing parseable came out, else *semantic*.
 
 ## Conventions applied (DEVIATIONS.md)
 

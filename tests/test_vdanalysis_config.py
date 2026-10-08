@@ -61,7 +61,7 @@ def test_rescore_factors_write_outside_results_folders(cfg):
 
 def test_controls_and_f3_models_as_decided(cfg):
     ctl = {c["name"]: c["models"] for c in cfg.controls}
-    assert ctl["AA_R"] == ["mistral_v02", "qwen25", "llama31", "phi35_mini", "granite31", "gemma3_4b"]
+    assert ctl["AA_R"] == ["mistral_v02", "qwen2", "qwen25", "llama31", "phi35_mini", "granite31"]
     assert ctl["PC_Q2K_R"] == ctl["PC_NODESC_R"] == ["mistral_v03", "qwen25", "llama31", "granite32"]
     assert cfg.changed_models("F3") == {"llama31", "qwen25", "mistral_v03", "granite30", "granite31",
                                         "granite32", "qwen3", "phi4_mini"}
@@ -69,3 +69,8 @@ def test_controls_and_f3_models_as_decided(cfg):
     assert both == ["qwen25->qwen3", "granite30->granite31", "granite31->granite32"]
     assert [cfg.pair_name(p) for p in cfg.pairs if cfg.n_changed("F6", p) >= 1] == [
         "qwen2->qwen25", "qwen25->qwen3", "llama3->llama31", "gemma2_2b->gemma3_4b"]
+
+
+def test_aa_models_are_three_design_three_held_out(cfg):
+    aa = next(c for c in cfg.controls if c["name"] == "AA_R")["models"]
+    assert sorted(cfg.models[m]["split"] for m in aa) == ["design"] * 3 + ["held-out"] * 3
