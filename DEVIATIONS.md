@@ -4,6 +4,45 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-09 — F4 complete: Qwen3-only repetition loop found at full scale
+
+All 48 F4 runs completed (20.2 hours; grammar-constrained decoding is
+CPU-bound token-masking overhead, not GPU-accelerated, hence much
+slower than D -- not a bug). The quick test (5 tasks/suite) found 0/270
+truncated `baseline`/`schema_drift` records and concluded the grammar
+does not cause endless whitespace or loops -- **true at that sample
+size, but incomplete**: at full scale (100 tasks), Qwen3 shows a real
+instance of exactly the loop pattern asked about, in a minority of its
+tool-call records. Confirmed directly by reading the raw truncated
+outputs, e.g.:
+
+```
+...": "theft crimes", "crime_type_v2": "theft crimes", "crime_type_v2":
+"theft crimes", "crime_type_v2": "theft crimes", "crime_type_v2": ...
+```
+
+**47/1800 (2.6%) of Qwen3's `baseline`/`schema_drift` records** hit
+this (6/600 `synthetic`, 16/600 `bfcl_simple`, 25/600 `bfcl_multiple`):
+the model gets stuck repeating the same key-value pair inside the
+`"arguments"` object until `max_tokens` cuts it off. Likely cause: the
+`generic_json` schema's `"arguments": {"type": "object"}` has no
+property constraints, so the grammar permits unlimited repeated
+key-value pairs there, and losing the `<think>` scratchpad (this
+protocol's other Qwen3 effect, logged above) removes whatever lets it
+normally converge on one answer and stop. **Scanned all 15 other
+models' `baseline`/`schema_drift` records (27,000 total) for the same
+pattern: zero occurrences.** This is a Qwen3-only effect, not a general
+risk of the `generic_json` grammar -- consistent with it being the
+one model whose `<think>` block the grammar also blocks. Logged here,
+not fixed (would require changing the grammar or dropping Qwen3, both
+out of scope for this already-labeled "grammar + thinking blocked"
+variant); counted as a real finding, not a harness bug.
+
+**Manifest diff vs. D (all 48 runs)**: exactly one field differs,
+identical across every run: `run_factors.F4_constrained_decoding: D =
+'off', F4 = 'generic_json'`. No other field differs on any of the 48
+runs.
+
 ## 2026-10-08 — Analysis conventions fixed before any verdict is computed
 
 Set here, before any pair difference exists, so none is chosen after seeing results. Implemented in `configs/analysis_official_folders.yaml` and `vdanalysis/` on branch `analysis-prep`.
