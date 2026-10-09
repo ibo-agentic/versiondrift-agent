@@ -4,6 +4,20 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-09 — R_unconstrained mapped to F1's existing data, no new run
+
+PLAN.md section 7 defines R as D + `max_tokens=1024` (item 1) +
+generic-JSON constrained decoding (item 2); item 2 also calls for "a
+separate unconstrained run" to measure raw format-failure rate
+(`R_unconstrained`). Checked directly, field-by-field, against the real
+F1 config (`scripts/real_run_one.py:build_config`, not assumed): F1
+differs from D in exactly one field, `model.max_tokens` (256 -> 1024) --
+identical to what R_unconstrained would be (D + max_tokens=1024, no
+constrained decoding, nothing else). **R_unconstrained == F1 exactly.**
+Mapped `R_unconstrained`'s `folder` to `F1` in `configs/
+analysis_official_folders.yaml` -- it reuses F1's existing 48-run data
+rather than requiring a separate run.
+
 ## 2026-10-09 — F4 complete: Qwen3-only repetition loop found at full scale
 
 All 48 F4 runs completed (20.2 hours; grammar-constrained decoding is

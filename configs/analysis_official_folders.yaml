@@ -84,7 +84,11 @@ protocols:
   R_F3:    {folder: R_F3,    confounded_models: {qwen3: grammar+thinking_blocked}}
   R_F5:    {folder: R_F5,    confounded_models: {qwen3: grammar+thinking_blocked}}
   R_F6:    {folder: R_F6,    confounded_models: {qwen3: grammar+thinking_blocked}}
-  R_unconstrained: {folder: R_unconstrained, control_only: true}
+  # 2026-10-09: R_unconstrained == F1 exactly (D + max_tokens=1024, no
+  # constrained decoding, nothing else differs -- confirmed field-by-field
+  # against the real F1 config, not assumed). Reuses F1's folder instead of
+  # a separate run. See DEVIATIONS.md.
+  R_unconstrained: {folder: F1, control_only: true}
   # controls (PLAN.md section 6); only the listed models need runs
   R_AA:           {folder: R_AA,           control_only: true}
   R_PC_Q2K:       {folder: R_PC_Q2K,       control_only: true}
