@@ -4,6 +4,36 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-09 — R: config confirmed, Qwen3 pre-split (all 3 suites)
+
+**Config confirmed field-by-field** (`scripts/real_run_one.py`'s `R`
+protocol vs `D`): exactly two fields differ --
+`constrained_decoding` (`off` -> `generic_json`) and `model.max_tokens`
+(256 -> 1024) -- matching PLAN.md section 7 items 1-2 exactly (items
+3-6 are reporting/gating rules, not generation-config changes).
+Confirmed this holds for Qwen3 too (no sampling override, thinking
+stays `"default"` -- its thinking-blocked effect is still a pure
+grammar side effect, not a config choice).
+
+**Quick test** (5 tasks/suite, qwen3/phi35_mini/mistral_v02): parse
+rate 1.000 and 0% truncation on `baseline`/`schema_drift` for all 3;
+0/90 Qwen3 loop-pattern records -- same as F4's quick test, which also
+read 0% before the real ~2.6% full-scale rate emerged, so this is not
+read as "no loop risk under R," just as an expected small-sample
+result.
+
+**Qwen3 pre-split (all 3 suites), before running, not reactive this
+time**: linearly extrapolating the quick test's per-suite times (x20
+for 100 vs 5 tasks) puts all 3 suites at 60-90 minutes -- nominally
+under the 2-hour ceiling, but F4's own full-scale run showed real
+behavior can diverge meaningfully from quick-test extrapolation on the
+slow side (the loop pattern that was invisible at quick-test scale
+cost real time at full scale). Given that precedent and R's added
+1024-token budget (any record that does loop burns through up to 4x
+more tokens before truncating, vs F4's 256), pre-split all 3 Qwen3
+suites via `scripts/split_run.py` rather than risk a wasted ~2-hour
+attempt.
+
 ## 2026-10-09 — R_unconstrained mapped to F1's existing data, no new run
 
 PLAN.md section 7 defines R as D + `max_tokens=1024` (item 1) +

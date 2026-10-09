@@ -51,6 +51,10 @@ PROTOCOL_THINKING = {
     # a structural SIDE EFFECT of the grammar (the config never turns it
     # off), labeled and reported separately. See DEVIATIONS.md.
     "F4_json": "default",
+    # R (PLAN.md section 7): same as F4_json's thinking note -- config
+    # stays "default", Qwen3's thinking is blocked as a side effect of the
+    # same generic_json grammar, labeled [grammar + thinking blocked].
+    "R": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -61,6 +65,8 @@ PROTOCOL_MAX_TOKENS = {
     "F3_rerun": 256,
     "F6": 256,
     "F4_json": 256,
+    # R (PLAN.md section 7, item 1): output budget 1024.
+    "R": 1024,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -73,6 +79,7 @@ PROTOCOL_PROMPT_FORMAT = {
     "F3_rerun": "native",
     "F6": "shared",
     "F4_json": "shared",
+    "R": "shared",
 }
 # protocol -> constrained_decoding override. F4's "generic_json" level is
 # the only one run (PLAN.md's "full_schema" level is deliberately cut --
@@ -85,6 +92,10 @@ PROTOCOL_CONSTRAINED_DECODING = {
     "F3_rerun": "off",
     "F6": "off",
     "F4_json": "generic_json",
+    # R (PLAN.md section 7, item 2): generic-JSON constrained decoding --
+    # same grammar/mechanism as F4_json, including Qwen3's thinking-block
+    # side effect. See DEVIATIONS.md, 2026-10-08.
+    "R": "generic_json",
 }
 
 # D's own shared sampling defaults (upgradecanary/model/llama_cpp_client.py's
