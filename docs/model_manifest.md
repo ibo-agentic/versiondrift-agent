@@ -92,6 +92,36 @@ uses the official Qwen org repo like Qwen2.5/Qwen3 already did. This
 matches `analysis/plan/feasibility.md`'s own choices, not a new decision
 made here.
 
+## 6. PLAN.md section 6 Q2_K positive control (2026-10-11)
+
+Q2_K quant of the 4 models used for the Q2_K positive control
+(`R_PC_Q2K`), downloaded via `scripts/download_q2k_controls.py` (same
+`curl -C -` resumable pattern as section 5). Every SHA-256 below is
+each file's HF "lfs.oid" field, fetched live via the HF tree API, and
+independently re-verified against a local SHA-256 of the actual
+downloaded bytes -- both matched for all 4 files.
+
+3 of 4 use the SAME source repo as their Q4_K_M file in sections 2-5
+above. **mistral_v03 does not**: its Q4_K_M repo
+(`itlwas/Mistral-7B-Instruct-v0.3-Q4_K_M-GGUF`) ships only that one
+quant -- confirmed via the HF API (`siblings` lists exactly 3 files:
+`.gitattributes`, `README.md`, the Q4_K_M file itself, no Q2_K).
+Asked the user directly before substituting anything (per standing
+instruction); decided to use `bartowski/Mistral-7B-Instruct-v0.3-GGUF`
+instead -- same base model (`mistralai/Mistral-7B-Instruct-v0.3`),
+different uploader/quantizer, already known to this project (section
+1's preliminary Q4_K_M source for the same model). Kept in its own
+`models/mistral_bartowski/` directory, separate from `models/itlwas/`,
+so the uploader change stays visible rather than hidden alongside the
+Q4_K_M file. See `DEVIATIONS.md`, 2026-10-11, for the full reasoning.
+
+| Path | Size (bytes) | GiB | SHA-256 | Source repository | Associated Q4_K_M repo |
+|---|---|---|---|---|---|
+| `models/qwen/qwen2.5-7b-instruct-q2_k.gguf` | 3,015,940,000 | 2.81 | `a0fc885ff014d73c02dcc4ad093f110c6dd4e0e308f84efe1accf078d364a87a` | Qwen/Qwen2.5-7B-Instruct-GGUF | same repo |
+| `models/llama/Meta-Llama-3.1-8B-Instruct-Q2_K.gguf` | 3,179,136,416 | 2.96 | `3f7f9265554ac91f1fb31c1b63b9cada4362533dfaa3f6e8dfc33c48d36909ce` | bartowski/Meta-Llama-3.1-8B-Instruct-GGUF | same repo |
+| `models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf` | 3,103,591,968 | 2.89 | `99e70f124d9be9d5f45118cfbfaf81b4cc6dc71c161205f04e6166c80fb3cef1` | bartowski/ibm-granite_granite-3.2-8b-instruct-GGUF | same repo |
+| `models/mistral_bartowski/Mistral-7B-Instruct-v0.3-Q2_K.gguf` | 2,722,877,664 | 2.54 | `6696020e424ccf3bc4ab6ac2bc639220f3d09ad6a225d5c3e16033a1ff9a4885` | bartowski/Mistral-7B-Instruct-v0.3-GGUF | **different repo** (itlwas has no Q2_K) |
+
 ## Notes
 
 - The two preliminary root-level Mistral files exist solely to keep earlier
