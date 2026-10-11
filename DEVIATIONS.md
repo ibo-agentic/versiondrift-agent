@@ -4,6 +4,35 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-11 — R complete: same Qwen3-only loop recurs, lower rate
+
+All 48 R runs completed. One isolated timing anomaly during the run
+(`qwen25/synthetic` took 13,829s vs F1's 461s for the same config,
+~30x) was checked directly: 0% truncation, normal record lengths, no
+looping -- not a generation-content issue, every surrounding run (10-18)
+stayed in the normal ~2.5x-vs-F1 range. Treated as an isolated
+external/environmental slowdown (not reproducible in content, so not a
+protocol or grammar issue) and excluded from the trend read.
+
+**Qwen3's repetition loop (same pattern as F4, logged 2026-10-09)
+recurs under R**: 26/1800 (1.44%) of its `baseline`/`schema_drift`
+records (0/600 synthetic, 10/600 bfcl_simple, 16/600 bfcl_multiple) --
+lower than F4's 2.6%, despite R's 4x larger token budget. All 26 are
+still truncated and still fail to parse (same failure mode: stuck
+repeating a key-value pair in the open-ended `"arguments"` object until
+`max_tokens`, just hitting that ceiling less often at 1024 tokens than
+at 256 -- plausible since a model that's going to loop either escapes
+early or doesn't, and a bigger budget mostly just means more repeated
+garbage before the same outcome, not a proportionally higher chance of
+looping in the first place). Scanned all 15 other models' equivalent
+records again: zero occurrences, consistent with F4. Not fixed, same
+reasoning as before.
+
+**Manifest diff vs. D (all 48 runs)**: exactly two fields differ,
+identical across every run: `run_factors.F1_max_tokens` (`256` ->
+`1024`) and `run_factors.F4_constrained_decoding` (`'off'` ->
+`'generic_json'`). No other field differs on any of the 48 runs.
+
 ## 2026-10-09 — R: config confirmed, Qwen3 pre-split (all 3 suites)
 
 **Config confirmed field-by-field** (`scripts/real_run_one.py`'s `R`
