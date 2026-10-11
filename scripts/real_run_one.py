@@ -55,6 +55,12 @@ PROTOCOL_THINKING = {
     # stays "default", Qwen3's thinking is blocked as a side effect of the
     # same generic_json grammar, labeled [grammar + thinking blocked].
     "R": "default",
+    # Controls (PLAN.md section 6, 2026-10-11): all three are R's config
+    # with exactly one change each (seed / tool-description text / model
+    # quant file) -- thinking itself stays "default" for all of them.
+    "R_AA": "default",
+    "R_PC_NODESC": "default",
+    "R_PC_Q2K": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -67,6 +73,9 @@ PROTOCOL_MAX_TOKENS = {
     "F4_json": 256,
     # R (PLAN.md section 7, item 1): output budget 1024.
     "R": 1024,
+    "R_AA": 1024,
+    "R_PC_NODESC": 1024,
+    "R_PC_Q2K": 1024,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -80,6 +89,13 @@ PROTOCOL_PROMPT_FORMAT = {
     "F6": "shared",
     "F4_json": "shared",
     "R": "shared",
+    "R_AA": "shared",
+    # R_PC_NODESC's ONE change from R: strip tool/parameter descriptions
+    # (runner.py's build_prompt already supports this prompt_format value
+    # -- PLAN.md section 6 positive control (b)). Names, types, and
+    # "required" are untouched (see _strip_descriptions' own docstring).
+    "R_PC_NODESC": "no_description",
+    "R_PC_Q2K": "shared",
 }
 # protocol -> constrained_decoding override. F4's "generic_json" level is
 # the only one run (PLAN.md's "full_schema" level is deliberately cut --
@@ -96,7 +112,18 @@ PROTOCOL_CONSTRAINED_DECODING = {
     # same grammar/mechanism as F4_json, including Qwen3's thinking-block
     # side effect. See DEVIATIONS.md, 2026-10-08.
     "R": "generic_json",
+    "R_AA": "generic_json",
+    "R_PC_NODESC": "generic_json",
+    "R_PC_Q2K": "generic_json",
 }
+# protocol -> seed override. Every protocol above uses the project's one
+# shared seed (1234); R_AA (PLAN.md section 6's A/A null control) is R
+# rerun with a different seed, 5678, and nothing else -- the ONLY
+# intentional seed change in this project. Threads into build_config's
+# top-level seed, model.seed, and trial_seeds (offset by the same amount
+# as D's own 1234/1235/1236 convention: base, base+1, base+2).
+PROTOCOL_SEED = {"R_AA": 5678}
+_DEFAULT_SEED = 1234
 
 # D's own shared sampling defaults (upgradecanary/model/llama_cpp_client.py's
 # library defaults) -- F6's greedy trial (index 0) is always pinned to
@@ -128,6 +155,24 @@ F6_RECOMMENDED_SAMPLING: dict[str, dict] = {
 }
 
 
+# PLAN.md section 6 positive control (a), 2026-10-11: Q2_K quant of the
+# same 4 models used for every control (mistral_v03, qwen25, llama31,
+# granite32). Downloaded from each model's own Q4_K_M source repo except
+# mistral_v03 (itlwas/Mistral-7B-Instruct-v0.3-Q4_K_M-GGUF ships only that
+# one quant, no Q2_K -- asked the user directly; decided to use
+# bartowski/Mistral-7B-Instruct-v0.3-GGUF's Q2_K instead, same base model,
+# different uploader/quantizer). See docs/model_manifest.md for sha256s.
+Q2K_MODEL_PATHS: dict[str, str] = {
+    # NOT from itlwas (that repo has no Q2_K) -- from bartowski instead,
+    # kept in its own path so the uploader change is visible, not hidden
+    # inside the itlwas/ directory alongside the Q4_K_M file.
+    "mistral_v03": "models/mistral_bartowski/Mistral-7B-Instruct-v0.3-Q2_K.gguf",
+    "qwen25": "models/qwen/qwen2.5-7b-instruct-q2_k.gguf",
+    "llama31": "models/llama/Meta-Llama-3.1-8B-Instruct-Q2_K.gguf",
+    "granite32": "models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf",
+}
+
+
 def build_config(
     model_key: str, gguf_path: str, suite: str, data_path: str,
     protocol: str = "D", output_dir: str | None = None,
@@ -136,6 +181,7 @@ def build_config(
     max_tokens = PROTOCOL_MAX_TOKENS[protocol]
     prompt_format = PROTOCOL_PROMPT_FORMAT[protocol]
     constrained_decoding = PROTOCOL_CONSTRAINED_DECODING[protocol]
+    seed = PROTOCOL_SEED.get(protocol, _DEFAULT_SEED)
     if output_dir is None:
         output_dir = f"results_v2/{protocol}/{model_key}/{suite}"
 
@@ -155,16 +201,23 @@ def build_config(
         }
     else:
         trial_sampling_extra = {}
+    if protocol == "R_PC_Q2K":
+        # Labels the semantic change explicitly in run_factors.F5_quant_level
+        # (resolve_run_factors reads model.quant_level) -- model_backend.
+        # model_path also differs (necessarily, swapping quant means
+        # swapping the file), so this is a second, clearer label for the
+        # same single change, not an additional change.
+        model_extra["quant_level"] = "Q2_K"
 
     return {
         "experiment": f"upgradecanary-real-{protocol}-{model_key}-{suite}",
-        "seed": 1234,
+        "seed": seed,
         "data": data_path,
         "output_dir": output_dir,
         "conditions": ["baseline", "schema_drift", "fault_reporting"],
         "trials": 3,
         "trial_temperatures": [0.0, sampled_temp, sampled_temp],
-        "trial_seeds": [1234, 1235, 1236],
+        "trial_seeds": [seed, seed + 1, seed + 2],
         **trial_sampling_extra,
         "prompt_format": prompt_format,
         "constrained_decoding": constrained_decoding,
@@ -176,7 +229,7 @@ def build_config(
             "n_gpu_layers": -1,
             "temperature": 0.0,
             "max_tokens": max_tokens,
-            "seed": 1234,
+            "seed": seed,
             # Explicit on every protocol (including D) so this key's
             # presence/absence is never itself a point of difference
             # between protocols -- "default" here is byte-identical to
@@ -209,7 +262,10 @@ def build_config(
 
 
 def main(model_key: str, suite: str, protocol: str = "D", task_limit: int | None = None) -> int:
-    gguf_path = dict(MODEL_ORDER)[model_key]
+    if protocol == "R_PC_Q2K":
+        gguf_path = Q2K_MODEL_PATHS[model_key]
+    else:
+        gguf_path = dict(MODEL_ORDER)[model_key]
     data_path = SUITES[suite]
     is_quick_test = task_limit is not None
 

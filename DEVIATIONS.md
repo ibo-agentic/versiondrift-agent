@@ -4,6 +4,52 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-11 — Controls defined (PLAN.md section 6), before any run
+
+All three are R's exact config with one change each, confirmed
+field-by-field in code (`scripts/real_run_one.py::build_config`) before
+running anything -- diffs shown below are the real computed diffs
+between `R` and each control's generated config, not descriptions.
+
+**A/A null control (`R_AA`)**: same model, same R config, **seed 5678
+instead of 1234** -- the top-level `seed` (task/perturbation draw),
+`model.seed`, and `trial_seeds` (`[5678, 5679, 5680]`, same base+1/+2
+convention as D's own `[1234, 1235, 1236]`) all shift together, nothing
+else. Models: mistral_v02, qwen2, qwen25, llama31, phi35_mini,
+granite31 (3 design + 3 held-out, PLAN.md section 6). Compared against
+the existing `R` run (same model, different seed only -- a correct
+verdict is always neutral).
+
+**No-description positive control (`R_PC_NODESC`)**: same R config,
+`prompt_format: no_description` instead of `shared` -- reuses
+`runner.py`'s existing `_strip_descriptions()` (already built for this
+exact purpose, PLAN.md section 6 positive control (b)): recursively
+drops every key literally named `"description"` from the tool list;
+names, parameter names, types, and `required` are all untouched.
+Models: mistral_v03, qwen25, llama31, granite32.
+
+**Q2_K positive control (`R_PC_Q2K`)**: same R config, the model's
+Q2_K GGUF instead of its Q4_K_M one -- `model.path` changes (mechanically
+necessary) and `model.quant_level` is set explicitly (`"Q2_K"`, was
+unset/`"unspecified"` under every other protocol) as a second, clearer
+label for the same one change. Models: mistral_v03, qwen25, llama31,
+granite32. **Source repos**: qwen25/llama31/granite32 use their own
+Q4_K_M repo (Qwen/Qwen2.5-7B-Instruct-GGUF, bartowski/Meta-Llama-3.1-8B-
+Instruct-GGUF, bartowski/ibm-granite_granite-3.2-8b-instruct-GGUF --
+each confirmed via the HF API to actually host a Q2_K file before
+downloading). **mistral_v03's own Q4_K_M repo
+(itlwas/Mistral-7B-Instruct-v0.3-Q4_K_M-GGUF) ships only that one
+quant -- confirmed via the HF API, no Q2_K file exists there.** Asked
+the user directly rather than silently substituting a repo; decided to
+use `bartowski/Mistral-7B-Instruct-v0.3-GGUF`'s Q2_K instead (same base
+model, `mistralai/Mistral-7B-Instruct-v0.3`, different uploader/
+quantizer -- this repo is already in `docs/model_manifest.md` as an
+earlier source for this same model's Q4_K_M, just not the one
+currently used). Downloaded into `models/mistral_bartowski/` (a
+separate directory from `models/itlwas/`, so the uploader change is
+visible, not hidden alongside the Q4_K_M file). Sizes/sha256s in
+`docs/model_manifest.md`.
+
 ## 2026-10-11 — R complete: same Qwen3-only loop recurs, lower rate
 
 All 48 R runs completed. One isolated timing anomaly during the run
