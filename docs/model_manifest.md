@@ -122,6 +122,16 @@ Q4_K_M file. See `DEVIATIONS.md`, 2026-10-11, for the full reasoning.
 | `models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf` | 3,103,591,968 | 2.89 | `99e70f124d9be9d5f45118cfbfaf81b4cc6dc71c161205f04e6166c80fb3cef1` | bartowski/ibm-granite_granite-3.2-8b-instruct-GGUF | same repo |
 | `models/mistral_bartowski/Mistral-7B-Instruct-v0.3-Q2_K.gguf` | 2,722,877,664 | 2.54 | `6696020e424ccf3bc4ab6ac2bc639220f3d09ad6a225d5c3e16033a1ff9a4885` | bartowski/Mistral-7B-Instruct-v0.3-GGUF | **different repo** (itlwas has no Q2_K) |
 
+**Imatrix info** (fetched live from each repo's own README, 2026-10-12
+-- not assumed uniform across uploaders):
+
+| Path | Imatrix used? | llama.cpp release | Calibration dataset |
+|---|---|---|---|
+| `models/qwen/qwen2.5-7b-instruct-q2_k.gguf` | **Not stated** -- Qwen's own README documents the quant levels offered but never mentions an imatrix option anywhere | n/a | n/a |
+| `models/llama/Meta-Llama-3.1-8B-Instruct-Q2_K.gguf` | Yes | [b3472](https://github.com/ggerganov/llama.cpp/releases/tag/b3472) | [bartowski1182 gist `eb213dcc...`](https://gist.github.com/bartowski1182/eb213dccb3571f863da82e99418f81e8) |
+| `models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf` | Yes | [b4778](https://github.com/ggerganov/llama.cpp/releases/tag/b4778) | same gist as llama31 (`eb213dcc...`) |
+| `models/mistral_bartowski/Mistral-7B-Instruct-v0.3-Q2_K.gguf` | Yes | [b2965](https://github.com/ggerganov/llama.cpp/releases/tag/b2965) | [bartowski1182 gist `b6ac4469...`](https://gist.github.com/bartowski1182/b6ac44691e994344625687afe3263b3a) (different dataset than llama31/granite32) |
+
 ## Notes
 
 - The two preliminary root-level Mistral files exist solely to keep earlier
