@@ -4,6 +4,42 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-12 — Controls complete: manifest diffs clean, 1 more timing anomaly
+
+All 42 control runs completed (`R_AA` 18, `R_PC_NODESC` 12, `R_PC_Q2K`
+12). **Manifest diff vs. R, confirmed directly for every model**:
+`R_AA` differs in exactly `seed` (top-level); `R_PC_NODESC` differs in
+exactly `run_factors.F3_prompt_format` (`shared` -> `no_description`);
+`R_PC_Q2K` differs in exactly `run_factors.F5_quant_level` and
+`model_backend.model_path` (both label the same one change -- swapping
+the quant file necessarily changes its path too). No other field
+differs for any control, any model.
+
+**A second apparent timing anomaly, corrected after checking both
+timing sources**: the orchestrator's own log line reported
+`R_PC_NODESC/granite32/bfcl_multiple` at 18,438s, which looked like
+another ~17x case of the `qwen25/synthetic` anomaly below. But that
+number is the orchestrator's *external* wrapper timer (around
+`subprocess.run()`), not the run's own internal timer --
+`real_run_one.py` writes its own `elapsed_seconds` into `_status.json`
+from a `perf_counter()` started *inside* the subprocess, around just
+the `run()` call, and that figure is **1670.9s**, a normal ~1.6x of
+R's 1059s. (This status.json figure is what `controls_report.md`'s
+table actually uses, not the orchestrator log's; the report was never
+wrong, only the live read of the raw log during the run was.) The
+~11x gap between the two timers means roughly 4.6 hours passed
+*outside* the subprocess's own measured work -- almost certainly the
+machine sleeping for a stretch between the orchestrator launching the
+subprocess and Python actually starting to execute inside it (or
+between finishing and the parent noticing), not a GPU/generation
+slowdown. **Systematically checked every run under R, the controls,
+F4, and F6 for the same log-vs-status-json gap (ratio > 1.5x or <
+0.67x): this is the only one.** The genuine internal slowdown
+(`qwen25/synthetic` under R, 2026-10-11, confirmed via its own
+`_status.json`, not just the log) remains a real, unexplained
+anomaly; this one is not -- corrected here rather than left
+double-counted as a second unexplained case.
+
 ## 2026-10-11 — Controls defined (PLAN.md section 6), before any run
 
 All three are R's exact config with one change each, confirmed
