@@ -105,6 +105,27 @@ overrides:
                                # RESCORED IN PLACE on 2026-10-07 (parsed_results.jsonl +
                                # summary.json); this is the rescored version.
     rescored_in_place: true
+  # 2026-10-12: R_F6 only ran on the held-out models whose sampling
+  # actually changes (llama3, llama31, gemma3_4b); every other held-out
+  # model's R_F6 config is identical to R (no recommendation to apply),
+  # so they map to R's folder instead of a separate run.
+  - {protocol: R_F6, model: phi3_mini,  folder: R}
+  - {protocol: R_F6, model: phi35_mini, folder: R}
+  - {protocol: R_F6, model: phi4_mini,  folder: R}
+  - {protocol: R_F6, model: granite30,  folder: R}
+  - {protocol: R_F6, model: granite31,  folder: R}
+  - {protocol: R_F6, model: granite32,  folder: R}
+  - {protocol: R_F6, model: gemma2_2b,  folder: R}
+  # 2026-10-12: R_F3 only ran on the held-out models with a real native
+  # tool template (llama31, phi4_mini, granite30/31/32); every other
+  # held-out model has no native template to switch to, so its R_F3
+  # config is identical to R (prompt_format can only be "shared"), and
+  # maps to R's folder instead of a separate run.
+  - {protocol: R_F3, model: llama3,     folder: R}
+  - {protocol: R_F3, model: phi3_mini,  folder: R}
+  - {protocol: R_F3, model: phi35_mini, folder: R}
+  - {protocol: R_F3, model: gemma2_2b,  folder: R}
+  - {protocol: R_F3, model: gemma3_4b,  folder: R}
 audit_only_folders:
   - F3/granite30               # pre-fix original, kept for audit only; the loader refuses it
 

@@ -61,6 +61,18 @@ PROTOCOL_THINKING = {
     "R_AA": "default",
     "R_PC_NODESC": "default",
     "R_PC_Q2K": "default",
+    # R_F6/R_F3 (nuisance factors under R, 2026-10-12): thinking stays
+    # "default" -- R_F3's Qwen3 would have the same grammar+thinking-
+    # blocked side effect as R itself if it were run on Qwen3, but Qwen3
+    # isn't a held-out model so it's out of scope for R_F3 this round.
+    "R_F6": "default",
+    "R_F3": "default",
+    # F11 (legacy chat wrapping, exploratory): D's config, only the
+    # wrapping mechanism changes -- thinking stays "default" (Qwen3 has
+    # no <think>-prefill trick under the plain legacy template, so it
+    # keeps thinking ON, same as D's own default; this is a real,
+    # expected consequence of swapping wrapping, not a second change).
+    "F11": "default",
 }
 # protocol -> max_tokens override. D's only output-budget factor is F1.
 PROTOCOL_MAX_TOKENS = {
@@ -76,6 +88,11 @@ PROTOCOL_MAX_TOKENS = {
     "R_AA": 1024,
     "R_PC_NODESC": 1024,
     "R_PC_Q2K": 1024,
+    "R_F6": 1024,
+    "R_F3": 1024,
+    # F11 (legacy chat wrapping): D's own budget, 256 -- only the
+    # wrapping mechanism changes.
+    "F11": 256,
 }
 # protocol -> prompt_format override. F3 is the only one that changes
 # the tool-format mechanism (native chat template + tools= instead of
@@ -96,6 +113,15 @@ PROTOCOL_PROMPT_FORMAT = {
     # "required" are untouched (see _strip_descriptions' own docstring).
     "R_PC_NODESC": "no_description",
     "R_PC_Q2K": "shared",
+    "R_F6": "shared",
+    # R_F3's ONE change from R: native tool template for the prompt
+    # (tools= rendering), same mechanism as F3 -- output stays grammar-
+    # constrained to generic JSON regardless (constrained_decoding is
+    # unchanged, see PROTOCOL_CONSTRAINED_DECODING below). validate_run_
+    # factors() already requires chat_wrapping: native for this, which
+    # every protocol except F11 already sets.
+    "R_F3": "native",
+    "F11": "shared",
 }
 # protocol -> constrained_decoding override. F4's "generic_json" level is
 # the only one run (PLAN.md's "full_schema" level is deliberately cut --
@@ -115,6 +141,11 @@ PROTOCOL_CONSTRAINED_DECODING = {
     "R_AA": "generic_json",
     "R_PC_NODESC": "generic_json",
     "R_PC_Q2K": "generic_json",
+    "R_F6": "generic_json",
+    "R_F3": "generic_json",
+    # F11 (legacy chat wrapping): D's own "off" -- only the wrapping
+    # mechanism changes.
+    "F11": "off",
 }
 # protocol -> seed override. Every protocol above uses the project's one
 # shared seed (1234); R_AA (PLAN.md section 6's A/A null control) is R
@@ -172,6 +203,25 @@ Q2K_MODEL_PATHS: dict[str, str] = {
     "granite32": "models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf",
 }
 
+# F11 (legacy chat wrapping, exploratory, 2026-10-12): the hand-typed
+# wrapper strings this project used before PLAN v1's native-template work
+# -- fetched from this project's own pre-PLAN configs (e.g. configs/
+# real_trials_itlwas_v0.3.yaml, configs/real_smoke_qwen3.yaml), not
+# reinvented. Mistral's own "[INST]" form (no explicit leading <s> --
+# llama.cpp's own tokenizer adds BOS); Qwen's own ChatML form, identical
+# across Qwen2/2.5/3 (same special tokens in all three). Deliberately
+# does NOT include Qwen3's <think></think> empty-prefill trick (that's a
+# separate, F2-specific mechanism) -- under F11, Qwen3's thinking stays
+# on by default, same as D, consistent with "only the wrapping changes."
+F11_PROMPT_TEMPLATES: dict[str, str] = {
+    "mistral_v01": "[INST]\n{prompt}\n[/INST]",
+    "mistral_v02": "[INST]\n{prompt}\n[/INST]",
+    "mistral_v03": "[INST]\n{prompt}\n[/INST]",
+    "qwen2": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant",
+    "qwen25": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant",
+    "qwen3": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant",
+}
+
 
 def build_config(
     model_key: str, gguf_path: str, suite: str, data_path: str,
@@ -187,7 +237,7 @@ def build_config(
 
     sampled_temp = _D_SAMPLED_TRIAL_TEMPERATURE
     model_extra: dict = {}
-    if protocol == "F6":
+    if protocol in ("F6", "R_F6"):
         preset = F6_RECOMMENDED_SAMPLING.get(model_key, {"temperature": sampled_temp, **_D_SAMPLING_DEFAULTS})
         sampled_temp = preset["temperature"]
         model_extra["sampling_preset"] = "recommended"
@@ -208,6 +258,10 @@ def build_config(
         # swapping the file), so this is a second, clearer label for the
         # same single change, not an additional change.
         model_extra["quant_level"] = "Q2_K"
+    chat_wrapping = "native"
+    if protocol == "F11":
+        chat_wrapping = "legacy"
+        model_extra["prompt_template"] = F11_PROMPT_TEMPLATES[model_key]
 
     return {
         "experiment": f"upgradecanary-real-{protocol}-{model_key}-{suite}",
@@ -224,7 +278,7 @@ def build_config(
         "model": {
             "provider": "llama_cpp",
             "path": gguf_path,
-            "chat_wrapping": "native",
+            "chat_wrapping": chat_wrapping,
             "n_ctx": 4096,
             "n_gpu_layers": -1,
             "temperature": 0.0,

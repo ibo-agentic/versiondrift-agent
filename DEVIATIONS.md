@@ -4,6 +4,66 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-12 — R_F6, R_F3, F11 defined, before any run
+
+**Source correction**: the native-tool-template model list below is
+NOT in `docs/model_manifest.md` (checked directly -- no mention of
+"native" there at all). It comes from `analysis/plan/feasibility.md`'s
+original research and `scripts/real_run_f3_orchestrator.py`'s
+`NATIVE_TEMPLATE_MODELS`, already used throughout this project for
+exactly this purpose. Using that list rather than stopping over the
+citation mismatch, since the underlying fact (which 8 models have a
+real native template) is unambiguous and already established.
+
+**R_F6** (nuisance factor F6 under R): R's exact config +
+`docs/sampling_presets.md`'s recommended sampling (same table and
+greedy-pinning mechanism as F6 -- reused the identical code branch,
+`if protocol in ("F6", "R_F6")`). Confirmed field-by-field vs R
+(llama31): only the sampling-related fields differ (trial
+temperature/top_p/top_k/min_p/repeat_penalty + the `sampling_preset`
+label), nothing else. **Run only the 3 held-out models whose sampling
+actually changes** (llama3, llama31, gemma3_4b -- same set F6 itself
+uses, intersected with held-out). The other 7 held-out models
+(phi3_mini, phi35_mini, phi4_mini, granite30/31/32, gemma2_2b) have a
+config identical to R (no recommendation to apply), so they're mapped
+to R's folder in `configs/analysis_official_folders.yaml` instead of a
+separate run -- same pattern as `R_unconstrained` -> `F1`.
+
+**R_F3** (nuisance factor F3 under R): R's exact config + native tool
+template for the prompt (`prompt_format: native`, same mechanism as
+F3) -- **output stays grammar-constrained to generic JSON regardless**
+(`constrained_decoding` is unchanged from R; `runner.py` already
+supports setting both `tools=` native rendering and a `response_schema`
+grammar on the same call, no code change needed). Confirmed
+field-by-field vs R (llama31): only `prompt_format` differs. The
+parser's existing aliases (`parameters_alias` for Llama 3.1,
+`list_wrapped`) already cover any plain-JSON shape that might appear
+even though the grammar should force the canonical `{"name",
+"arguments"}` shape -- not a new parser change. **Run only the 5
+held-out models with a real native template** (llama31, phi4_mini,
+granite30, granite31, granite32). The other 5 held-out models (llama3,
+phi3_mini, phi35_mini, gemma2_2b, gemma3_4b) have no native template to
+switch to, so their R_F3 config is identical to R; mapped to R's
+folder.
+
+**F11** (legacy chat wrapping, exploratory): D's exact config, only
+`model.chat_wrapping` (`native` -> `legacy`) and `model.prompt_template`
+change (the second field necessarily follows from the first -- legacy
+wrapping needs an explicit template string, same double-label pattern
+as `R_PC_Q2K`'s quant_level + model_path). **Template strings are this
+project's own pre-PLAN hand-typed wrappers**, taken directly from
+existing configs, not reinvented: Mistral's `"[INST]\n{prompt}\n[/INST]"`
+(e.g. `configs/real_trials_itlwas_v0.3.yaml`), Qwen's ChatML form
+`"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant"` (e.g.
+`configs/real_smoke_qwen3.yaml`), identical across Qwen2/2.5/3 (same
+special tokens). Deliberately excludes Qwen3's `<think></think>`
+empty-prefill trick -- that's F2's mechanism, not F11's; under F11,
+Qwen3's thinking stays on by default, same as D, a real and expected
+consequence of swapping wrapping mechanisms, not a second config
+change. Models: mistral_v01, mistral_v02, mistral_v03, qwen2, qwen25,
+qwen3 (all 6 already listed for F11 in `configs/
+analysis_official_folders.yaml` from the `analysis-prep` merge).
+
 ## 2026-10-12 — Controls complete: manifest diffs clean, 1 more timing anomaly
 
 All 42 control runs completed (`R_AA` 18, `R_PC_NODESC` 12, `R_PC_Q2K`
