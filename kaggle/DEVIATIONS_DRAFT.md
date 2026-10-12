@@ -32,6 +32,11 @@ difference from the laptop D runs. This is the **hardware-check difference**.
 Result: **[TO FILL IN after import: per-model/suite greedy match rate and the llama3 -> llama31 hardware-check
 difference]**.
 
+**Kaggle session 1 runs only the hardware check. It passes if each run's greedy score and parse rate are within
+0.03 of the laptop D run; if not, F5/R_F5 on Kaggle stop until the cause is found.** (Per run = per model x suite,
+6 runs; greedy = trial_index 0; computed by `vdanalysis/hwcheck.py`, table `hwcheck_runs`. An incomplete check
+is never a pass.) F5 and R_F5 sessions are started only after the check has been imported and has passed.
+
 **How F5 / R_F5 are reported.** F5 and R_F5 8B results are reported next to the hardware-check difference for
 the llama3 -> llama31 pair; any F5 flip smaller than that difference is labeled "within hardware noise".
 The sampled trials are not expected to match across machines (llama.cpp seeding is best-effort), so they
@@ -46,7 +51,7 @@ Llama 3/3.1 and Granite 3.0/3.1/3.2 use the same bartowski repos. Source URLs an
 
 **Scope on Kaggle.** F5: mistral_v01, mistral_v02, mistral_v03, qwen2, qwen25, qwen3, llama3, llama31, granite30,
 granite31, granite32 (11 models x 3 suites = 33 runs). R_F5: held-out 8B models only (llama3, llama31, granite30,
-granite31, granite32; 15 runs). Hardware check: 6 runs. Sessions are time-boxed (no new run after 10.5 h);
+granite31, granite32; 15 runs). Hardware check: 6 runs (session 1). Sessions are time-boxed (no new run after 10.5 h);
 each later session resumes from verified zips, so a run is never split across sessions.
 
 **Other notes.** Qwen3 F5 runs as a single un-split run per suite on Kaggle; the laptop pre-split Qwen3 runs

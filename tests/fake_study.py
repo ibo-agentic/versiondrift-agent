@@ -70,6 +70,7 @@ def fake_config_dict(root: Path, rescored_root: Path | None = None) -> dict:
         "R_F5": {"folder": "R_F5", "confounded_models": {"q_new": "grammar+thinking_blocked"}},
         "R_F6": {"folder": "R_F6", "confounded_models": {"q_new": "grammar+thinking_blocked"}},
         "R_AA": {"folder": "R_AA", "control_only": True},
+        "KAGGLE_HWCHECK": {"folder": "KAGGLE_HWCHECK", "models": ["h_old", "h_new"], "control_only": True},
         "R_PC_Q2K": {"folder": "R_PC_Q2K", "control_only": True},
     }
     return {
@@ -103,6 +104,8 @@ def fake_config_dict(root: Path, rescored_root: Path | None = None) -> dict:
             "nuisance": ["F3", "F5", "F6"],
         },
         "robust": {"base": "R", "nuisance": {"F3": "R_F3", "F5": "R_F5", "F6": "R_F6"}},
+        "hardware_check": {"pair": {"old": "h_old", "new": "h_new"}, "laptop_protocol": "D",
+                           "kaggle_protocol": "KAGGLE_HWCHECK", "tolerance": 0.03},
         "qwen3_study": {"model": "q_new", "thinking_off": "F2", "grammar": "F4_json"},
         "controls": [
             {"name": "AA_R", "kind": "aa", "protocol_a": "R", "protocol_b": "R_AA", "gate": "ci",
@@ -121,6 +124,8 @@ def _model_split(m: str) -> str:
 # ---- failure profiles: (protocol, model) -> list of failing task indices ----
 def failing_tasks(protocol: str, model: str) -> list[int]:
     six = list(range(6))
+    if model == "h_new" and protocol == "KAGGLE_HWCHECK":
+        return list(range(7))  # one more failing task than D: hardware diff -0.05, greedy score -1/30
     if model == "h_new" and protocol in ("D", "F3", "F4_json", "F5", "F6"):
         return six
     if model == "b_old":
@@ -217,9 +222,7 @@ def write_run(root: Path, folder: str, protocol: str, model: str, suite: str, *,
 def build_fake_results(root: Path, cfg_dict: dict | None = None) -> dict:
     cfg_dict = cfg_dict or fake_config_dict(root)
     for protocol, spec in cfg_dict["protocols"].items():
-        models = spec.get("models") or MODELS
-        if spec.get("control_only"):
-            models = CONTROL_MODELS
+        models = spec.get("models") or (CONTROL_MODELS if spec.get("control_only") else MODELS)
         for model in models:
             for suite in SUITES:
                 folder = spec["folder"]

@@ -23,6 +23,7 @@ class Analysis:
         self.with_ci = with_ci
         self.allow_missing = allow_missing
         self.missing: list[str] = []
+        self.hwcheck_notes: list[str] = []  # optional Kaggle hardware check: never 'missing'
         self._rows: dict[str, dict[tuple, dict]] = {}
 
     # ---- run access -----------------------------------------------------

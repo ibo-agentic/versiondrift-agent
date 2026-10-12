@@ -71,7 +71,11 @@ protocols:
     folder: F4_json
     expect_manifest: {F4_constrained_decoding: generic_json}
     confounded_models: {qwen3: grammar+thinking_blocked}
-  F5: {folder: F5}                       # folder name assumed; edit if the Q8_0 runs land elsewhere
+  F5: {folder: F5}                       # Q8_0: 8B models from Kaggle, small models from the laptop, same folder
+  # Kaggle hardware check: the D config + the laptop's Q4_K_M files, re-run on 2x T4 (llama3, llama31).
+  # Never a decision protocol: only read by vdanalysis/hwcheck.py (see the hardware_check block).
+  KAGGLE_HWCHECK: {folder: KAGGLE_HWCHECK, models: [llama3, llama31], control_only: true,
+                   expect_manifest: {F1_max_tokens: 256}}
   F6: {folder: F6, expect_manifest: {F6_sampling_preset: recommended}}
   F11: {folder: F11, models: [mistral_v01, mistral_v02, mistral_v03, qwen2, qwen25, qwen3],
         expect_manifest: {F11_chat_wrapping: legacy}}
@@ -148,6 +152,14 @@ factor_groups:
   format: [F1, F2, F4, F7]                           # H2
   other: [F3, F5, F6, F8]                            # H2
   nuisance: [F3, F5, F6]                             # H4
+
+# ---- Kaggle hardware check (DEVIATIONS draft: F5/R_F5 on Kaggle T4) ----
+# hardware_diff = pair stress diff on Kaggle minus the same on the laptop (vdanalysis/hwcheck.py).
+hardware_check:
+  pair: {old: llama3, new: llama31}
+  laptop_protocol: D
+  kaggle_protocol: KAGGLE_HWCHECK
+  tolerance: 0.03          # per run: |greedy score diff| and |parse rate diff| must both be <= this
 
 # ---- robust protocol R (PLAN.md section 7) ----
 robust:

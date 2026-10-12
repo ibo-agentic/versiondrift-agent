@@ -19,6 +19,7 @@ from .aggregate import disagreement, flip_rates, hypotheses
 from .config import Config, assert_safe_output_dir, load_config
 from .controls import control_rows, control_summary, per_control_summary
 from .engine import Analysis
+from .hwcheck import hwcheck_pair_rows, hwcheck_run_rows, hwcheck_spec, hwcheck_summary
 from .studies import failure_split, qwen3_f4_vs_f2, qwen3_pair_labels, robust_checks
 
 
@@ -67,6 +68,13 @@ def run_all(cfg: Config, out_dir: Path, with_ci: bool = True, allow_missing: boo
     ctl_sum = control_summary(ctl_rows)
     hyp = hypotheses(cfg, an, flips, ctl_sum)
 
+    # Optional Kaggle hardware check (config block ``hardware_check``).
+    hw_pair = hwcheck_pair_rows(an)
+    hw_runs = hwcheck_run_rows(an)
+    hw_summary = []
+    if hwcheck_spec(an):
+        hw_summary = [hwcheck_summary(hw_pair, hw_runs, expected_runs=2 * len(cfg.suites))]
+
     # Disagreement over named factor sets.
     dis = []
     for set_name, factors in cfg.groups.items():
@@ -97,6 +105,9 @@ def run_all(cfg: Config, out_dir: Path, with_ci: bool = True, allow_missing: boo
         "qwen3_pair_labels": qwen3_pair_labels(an),
         "robust_protocol_checks": robust_checks(an),
         "hypotheses": hyp,
+        "hwcheck_pair": hw_pair,
+        "hwcheck_runs": hw_runs,
+        "hwcheck_summary": hw_summary,
     }
     for name, rows in tables.items():
         write_csv(out_dir / f"{name}.csv", rows)
@@ -105,7 +116,8 @@ def run_all(cfg: Config, out_dir: Path, with_ci: bool = True, allow_missing: boo
     report = _report(cfg, tables, hyp, warnings, an.missing)
     (out_dir / "report.md").write_text(report, encoding="utf-8")
     (out_dir / "run_warnings.json").write_text(
-        json.dumps({"warnings": warnings, "missing": an.missing}, indent=2), encoding="utf-8")
+        json.dumps({"warnings": warnings, "missing": an.missing, "hwcheck_notes": an.hwcheck_notes},
+                   indent=2), encoding="utf-8")
     return {"tables": tables, "warnings": warnings, "missing": an.missing, "report": report}
 
 

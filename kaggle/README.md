@@ -71,9 +71,11 @@ Use B only if you want to change code without re-uploading a dataset. The branch
 3. Add the code dataset as Input.
 4. Run all. Order: llama-cpp-python build (10-20 min), hardware check, F5, R_F5.
 
-To gate on the hardware check: set `PHASES = ["hwcheck"]` for a first short session, import and compare on the
-laptop (section 5), then run again with `PHASES = ["F5", "R_F5"]`. Otherwise leave all phases: the
-hardware-check zips are the first produced, so you can compare them while the session continues.
+`RUN_GROUP` (first cell) chooses what a session runs: `hwcheck` (6 runs, the default), `f5` (33 runs),
+`r_f5` (15 runs) or `all`. Session 1 should be `hwcheck` only: import and compare on the laptop (section 5);
+only if it passes (DEVIATIONS draft: each run's greedy score and parse rate within 0.03 of the laptop D run)
+set `RUN_GROUP = "f5"` / `"r_f5"` (or `"all"`) for the next sessions. Groups can be run in any order and
+resumed; a model needed by both `f5` and `r_f5` is downloaded again per session.
 
 Disk: Q8_0 files are 8-9 GB each. Each worker downloads one model, runs all of that model's suites, then deletes
 it. GGUFs go to `/kaggle/temp`, results to `/kaggle/working`.
@@ -119,6 +121,12 @@ Compares only the greedy trial (`trial_index == 0`, 300 records per run) one to 
 (task_id, condition): prompt hash equal, raw output equal (the match rate), parsed call equal, score equal.
 Prints mismatching examples. It reports counts and rates only and computes no verdicts or version-pair
 differences. Not run on real data yet.
+
+The pair-level reading and the 0.03 pass criterion are in the analysis pipeline (`vdanalysis/hwcheck.py`,
+config block `hardware_check`, protocol `KAGGLE_HWCHECK`): `python -m vdanalysis.run_analysis ...` writes
+`hwcheck_pair.csv` (llama3 -> llama31 stress diff on Kaggle minus on the laptop, per suite),
+`hwcheck_runs.csv` (greedy score and parse rate per model x suite, Kaggle vs laptop, within 0.03?) and
+`hwcheck_summary.csv`. Tested on fake data only.
 
 ## Model sources
 
