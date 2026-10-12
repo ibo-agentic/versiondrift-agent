@@ -78,7 +78,7 @@ def test_plan_counts_and_scope():
     assert len(by["F5"]) == 33
     assert len(by["R_F5"]) == 15
     assert {m for m, _ in by["R_F5"]} == set(plan.HELD_OUT_8B)
-    assert {m for m, _ in by["KAGGLE_HWCHECK"]} == {"llama31", "mistral_v02"}
+    assert {m for m, _ in by["KAGGLE_HWCHECK"]} == {"llama3", "llama31"}
     assert len(jobs) == len(set(jobs))
 
 
@@ -94,7 +94,7 @@ def test_plan_hashes_are_sha256_hex_and_every_model_has_a_source():
 def test_hwcheck_files_match_laptop_manifest_hashes():
     # sha256 values from docs/model_manifest.md (sections 2 and 5)
     assert plan.Q4_SOURCES["llama31"][0].sha256 == "7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c"
-    assert plan.Q4_SOURCES["mistral_v02"][0].sha256 == "aaae8abe274e1521d5aa80bf32cf18b408fc44b9d6869acbdc815440296d275e"
+    assert plan.Q4_SOURCES["llama3"][0].sha256 == "8ba9baf3a7345f705a11878397500fb25174034f0fd784e83aa4a96aaa47735f"
 
 
 # ---------------------------------------------------------------- verify

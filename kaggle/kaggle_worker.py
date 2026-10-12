@@ -146,6 +146,8 @@ def main(argv=None) -> int:
     ap.add_argument("--phases", nargs="+", default=["hwcheck", "F5", "R_F5"])
     ap.add_argument("--deadline-epoch", type=float, default=float("inf"),
                     help="do not START a new run after this unix time")
+    ap.add_argument("--hard-limit-epoch", type=float, default=float("inf"),
+                    help="do not start a run expected to end after this unix time (Kaggle's 12 h kill)")
     ap.add_argument("--repo-commit", default=None)
     args = ap.parse_args(argv)
 
@@ -162,13 +164,16 @@ def main(argv=None) -> int:
     bundles = plan.build_bundles(tuple(args.phases))
     log(f"worker start; {len(bundles)} bundles, phases={args.phases}")
     n_ok = n_fail = 0
+    longest = 0.0  # longest run seen by this worker this session (seconds)
+    stopped_for_time = False
     for b in bundles:
         todo = [(p, s) for (p, s) in b.jobs if not is_done(repo, p, b.model_key, s)]
         if not todo:
             log(f"[{b.name}] all {len(b.jobs)} runs already complete, skipping")
             continue
         if time.time() > args.deadline_epoch:
-            log("deadline passed; not starting new bundles")
+            log("time budget reached; not starting new bundles")
+            stopped_for_time = True
             break
         if not claim(state_dir, b.name, gpu):
             continue
@@ -185,8 +190,10 @@ def main(argv=None) -> int:
         gguf = str(models_dir / b.files[0].filename)
 
         for protocol, suite in todo:
-            if time.time() > args.deadline_epoch:
-                log(f"[{b.name}] deadline passed; stopping before {protocol}/{suite}")
+            if time.time() > args.deadline_epoch or time.time() + 1.25 * longest > args.hard_limit_epoch:
+                log(f"[{b.name}] time budget reached; not starting {protocol}/{suite} "
+                    f"(longest run so far {longest:.0f}s)")
+                stopped_for_time = True
                 break
             quarantine_partial(repo, protocol, b.model_key, suite, log)
             t0 = time.perf_counter()
@@ -197,6 +204,7 @@ def main(argv=None) -> int:
                 cwd=str(repo), env=dict(os.environ),
             )
             elapsed = time.perf_counter() - t0
+            longest = max(longest, elapsed)
             if proc.returncode == 0 and is_done(repo, protocol, b.model_key, suite):
                 z = make_run_zip(repo, protocol, b.model_key, suite, export_dir)
                 n_ok += 1
@@ -207,9 +215,15 @@ def main(argv=None) -> int:
             else:
                 n_fail += 1
                 log(f"[{protocol}/{b.model_key}/{suite}] FAILED (exit {proc.returncode}); will be retried on next launch")
+        if stopped_for_time:
+            for f in b.files:
+                (models_dir / f.filename).unlink(missing_ok=True)
+            break
         for f in b.files:  # free disk for the next bundle
             (models_dir / f.filename).unlink(missing_ok=True)
-    log(f"worker done: {n_ok} runs ok, {n_fail} failed/skipped this session")
+    pending = [f"{p}/{m}/{s}" for p, m, s in plan.all_jobs(tuple(args.phases)) if not is_done(repo, p, m, s)]
+    log(f"worker done: {n_ok} runs ok, {n_fail} failed/skipped this session; "
+        f"{'stopped for time budget; ' if stopped_for_time else ''}{len(pending)} runs still pending overall")
     return 0 if n_fail == 0 else 1
 
 

@@ -138,7 +138,8 @@ def restore_from_inputs(repo: Path, export_dir: Path, input_root: str | Path = "
 
 # ------------------------------------------------------------------- launch
 def launch_workers(repo: Path, models_dir: Path, state_dir: Path, export_dir: Path, phases, deadline_epoch: float,
-                   repo_commit: str | None, gpus=("0", "1")) -> list[subprocess.Popen]:
+                   repo_commit: str | None, gpus=("0", "1"),
+                   hard_limit_epoch: float | None = None) -> list[subprocess.Popen]:
     shutil.rmtree(state_dir / "claims", ignore_errors=True)  # claims are per session
     state_dir.mkdir(parents=True, exist_ok=True)
     procs = []
@@ -148,6 +149,8 @@ def launch_workers(repo: Path, models_dir: Path, state_dir: Path, export_dir: Pa
         cmd = [sys.executable, str(HERE / "kaggle_worker.py"), "--repo", str(repo), "--models-dir", str(models_dir),
                "--state-dir", str(state_dir), "--export-dir", str(export_dir), "--phases", *phases,
                "--deadline-epoch", str(deadline_epoch)]
+        if hard_limit_epoch:
+            cmd += ["--hard-limit-epoch", str(hard_limit_epoch)]
         if repo_commit:
             cmd += ["--repo-commit", repo_commit]
         procs.append(subprocess.Popen(cmd, env=env, stdout=out, stderr=subprocess.STDOUT, cwd=str(repo)))

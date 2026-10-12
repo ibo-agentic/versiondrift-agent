@@ -115,13 +115,15 @@ Q8_SOURCES: dict[str, tuple[GGUFFile, ...]] = {
 # ---- Q4_K_M sources for the hardware check: the SAME files as the laptop ----
 # (hashes match docs/model_manifest.md sections 2 and 5).
 Q4_SOURCES: dict[str, tuple[GGUFFile, ...]] = {
+    "llama3": (GGUFFile("bartowski/Meta-Llama-3-8B-Instruct-GGUF", "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
+                        "8ba9baf3a7345f705a11878397500fb25174034f0fd784e83aa4a96aaa47735f", 4920734272),),
     "llama31": (GGUFFile("bartowski/Meta-Llama-3.1-8B-Instruct-GGUF", "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
                          "7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c", 4920739232),),
-    "mistral_v02": (GGUFFile("itlwas/Mistral-7B-Instruct-v0.2-Q4_K_M-GGUF", "mistral-7b-instruct-v0.2-q4_k_m.gguf",
-                             "aaae8abe274e1521d5aa80bf32cf18b408fc44b9d6869acbdc815440296d275e", 4368440544),),
 }
 
-HWCHECK_MODELS = ("llama31", "mistral_v02")
+# Hardware check = an adjacent upgrade pair (llama3 -> llama31), so the
+# machine-to-machine difference can be read directly against a pair difference.
+HWCHECK_MODELS = ("llama3", "llama31")
 # Held-out 8B models (R_F5 scope). Order is the order in the user's request.
 HELD_OUT_8B = ("llama3", "llama31", "granite30", "granite31", "granite32")
 ALL_Q8_MODELS = ("mistral_v01", "mistral_v02", "mistral_v03", "qwen2", "qwen25", "qwen3",

@@ -25,7 +25,7 @@ Nothing here has been run on a model. The notebook is built, not run.
 
 | Phase | Config | Quant | Models | Runs |
 |---|---|---|---|---|
-| `hwcheck` -> `results_v2/KAGGLE_HWCHECK/` | D (unchanged) | Q4_K_M (laptop's exact files) | llama31, mistral_v02 | 2 x 3 suites = 6 |
+| `hwcheck` -> `results_v2/KAGGLE_HWCHECK/` | D (unchanged) | Q4_K_M (laptop's exact files) | llama3, llama31 (adjacent pair) | 2 x 3 suites = 6 |
 | `F5` -> `results_v2/F5/` | D | Q8_0 | mistral_v01/v02/v03, qwen2, qwen25, qwen3, llama3, llama31, granite30/31/32 | 11 x 3 = 33 |
 | `R_F5` -> `results_v2/R_F5/` | R | Q8_0 | llama3, llama31, granite30/31/32 | 5 x 3 = 15 |
 
@@ -91,7 +91,7 @@ That difference is what the hardware check measures.
 
 ## 3. Saving progress and resuming (12 h sessions)
 
-* A run is the unit of progress. After every run its folder is zipped to `/kaggle/working/export/kaggle__<protocol>__<model>__<suite>.zip`. A worker does not start a run after `SESSION_BUDGET_HOURS` (11.25 h).
+* A run is the unit of progress. After every run its folder is zipped to `/kaggle/working/export/kaggle__<protocol>__<model>__<suite>.zip`. A worker does not start a run after `SESSION_BUDGET_HOURS` (10.5 h), and also not one expected (1.25 x the longest run it has seen) to outlast 11.5 h; running runs finish, are zipped, and the notebook ends with a list of what is still pending.
 * **Download zips as they appear** (Output / file browser panel). Files in `/kaggle/working` are not guaranteed to survive a session that dies without being saved.
 * To resume: put the downloaded zips in a private dataset (or attach the earlier notebook version's output) and Add Input. Step 5 of the notebook verifies each zip (CRC, 900/900 records, hashes, factors) and skips runs that are already complete. A failed or partial attempt is moved to `results_v2/_failed_attempts/` before a retry, so a suite never holds two run folders.
 
@@ -128,8 +128,8 @@ every run's `run_manifest.json`.
 
 | Model | Quant | Used in | Source file (Hugging Face) | SHA-256 |
 |---|---|---|---|---|
+| llama3 | Q4_K_M | hardware check | [bartowski/Meta-Llama-3-8B-Instruct-GGUF/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf](https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf) | `8ba9baf3a7345f705a11878397500fb25174034f0fd784e83aa4a96aaa47735f` |
 | llama31 | Q4_K_M | hardware check | [bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf](https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf) | `7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c` |
-| mistral_v02 | Q4_K_M | hardware check | [itlwas/Mistral-7B-Instruct-v0.2-Q4_K_M-GGUF/mistral-7b-instruct-v0.2-q4_k_m.gguf](https://huggingface.co/itlwas/Mistral-7B-Instruct-v0.2-Q4_K_M-GGUF/resolve/main/mistral-7b-instruct-v0.2-q4_k_m.gguf) | `aaae8abe274e1521d5aa80bf32cf18b408fc44b9d6869acbdc815440296d275e` |
 | mistral_v01 | Q8_0 | F5 | [QuantFactory/Mistral-7B-Instruct-v0.1-GGUF/Mistral-7B-Instruct-v0.1.Q8_0.gguf](https://huggingface.co/QuantFactory/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/Mistral-7B-Instruct-v0.1.Q8_0.gguf) | `eb1d45a507b3f74bf9ae16189be93dcacab1dd4577f134565913b024737a7a6a` |
 | mistral_v02 | Q8_0 | F5 | [QuantFactory/Mistral-7B-Instruct-v0.2-GGUF/Mistral-7B-Instruct-v0.2.Q8_0.gguf](https://huggingface.co/QuantFactory/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/Mistral-7B-Instruct-v0.2.Q8_0.gguf) | `7245da8144b0636e0a776cb3b0b706421bb02d2034b1c5e8de19cd37e05a54d9` |
 | mistral_v03 | Q8_0 | F5 | [QuantFactory/Mistral-7B-Instruct-v0.3-GGUF/Mistral-7B-Instruct-v0.3.Q8_0.gguf](https://huggingface.co/QuantFactory/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.Q8_0.gguf) | `c19dd08e2787e8337d3b58f035cfc737d4510bde5dad7415dabed80bde9d1b80` |
