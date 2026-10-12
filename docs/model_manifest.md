@@ -132,6 +132,25 @@ Q4_K_M file. See `DEVIATIONS.md`, 2026-10-11, for the full reasoning.
 | `models/granite/ibm-granite_granite-3.2-8b-instruct-Q2_K.gguf` | Yes | [b4778](https://github.com/ggerganov/llama.cpp/releases/tag/b4778) | same gist as llama31 (`eb213dcc...`) |
 | `models/mistral_bartowski/Mistral-7B-Instruct-v0.3-Q2_K.gguf` | Yes | [b2965](https://github.com/ggerganov/llama.cpp/releases/tag/b2965) | [bartowski1182 gist `b6ac4469...`](https://gist.github.com/bartowski1182/b6ac44691e994344625687afe3263b3a) (different dataset than llama31/granite32) |
 
+## 7. PLAN.md F5 Q8_0 files for the 5 laptop (small) models (2026-10-13)
+
+Q8_0 of the 5 models whose F5 / R_F5 runs happen on the laptop
+(`scripts/real_run_f5_small_orchestrator.py`), downloaded via
+`scripts/download_q8_small_models.py` (resumable `curl -C -`). Every SHA-256
+below is the file's HF "lfs.oid" (HF tree API, 2026-10-13) AND was verified
+against a local SHA-256 of the downloaded bytes: all 5 matched. Same source
+repo as each model's Q4_K_M file in section 5 (every repo ships a Q8_0; no
+substitution was needed). The 8B models' Q8_0 files are not stored locally;
+they run on Kaggle (sources and hashes in `kaggle/README.md`).
+
+| Path | Size (bytes) | GiB | SHA-256 | Source repository |
+|---|---|---|---|---|
+| `models/gemma/gemma-2-2b-it-Q8_0.gguf` | 2,784,495,456 | 2.59 | `2d448a9aab894b8e8e18168cf3f490cb9f65632222f29f93514ac9ecc754debe` | bartowski/gemma-2-2b-it-GGUF |
+| `models/gemma/google_gemma-3-4b-it-Q8_0.gguf` | 4,130,226,592 | 3.85 | `0bce184b82f70ef6f1fb12c8d4984844baaa0bad0f4aae7150e443f803c4f509` | bartowski/google_gemma-3-4b-it-GGUF |
+| `models/phi/Phi-3-mini-4k-instruct-Q8_0.gguf` | 4,061,221,376 | 3.78 | `0ac8ee48aeebf7d1b354691fd1e29e91c32ad88bbad10ad45ac880dcd4372a47` | bartowski/Phi-3-mini-4k-instruct-GGUF |
+| `models/phi/Phi-3.5-mini-instruct-Q8_0.gguf` | 4,061,222,688 | 3.78 | `76fbf02f6fe92af57dbd818409bc8a0240026f1f3609bb405c3be94c973fb823` | bartowski/Phi-3.5-mini-instruct-GGUF |
+| `models/phi/microsoft_Phi-4-mini-instruct-Q8_0.gguf` | 4,084,611,456 | 3.80 | `a12f242c4ee379b9da91673e5d78b30bfacfe4fd86a0b2259d2ecad5d93cb6c7` | bartowski/microsoft_Phi-4-mini-instruct-GGUF |
+
 ## Notes
 
 - The two preliminary root-level Mistral files exist solely to keep earlier
