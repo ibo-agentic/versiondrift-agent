@@ -4,6 +4,24 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-12 — R_F6/R_F3/F11 quick tests passed; F11's Qwen3 not pre-split
+
+Quick test (5 tasks/suite): `R_F6/llama31` and `R_F3/granite31` both
+1.000 parse rate, 0.000 truncation; `F11/mistral_v02` 0.967 parse rate
+(minor format drift under the old wrapper, not truncation -- 0.000),
+90 tool-call records each. `R_F3`'s tool-name render check verified
+directly (not just inferred from a clean run): rendered granite31's
+real native template with the `get_weather` tool and confirmed the
+name appears in the output (`missing_tool_names()` returns empty).
+
+**F11's Qwen3 is NOT pre-split**: F11 is D's exact config except the
+wrapping mechanism (legacy vs. native) -- no grammar, same 256-token
+budget, same thinking-on default. D's own Qwen3 timings (synthetic
+3845s, bfcl_simple 4865s, bfcl_multiple 5058s) all ran as single,
+unsplit runs comfortably under the 2-hour ceiling, and nothing about
+swapping the wrapping mechanism should change generation length or
+cost -- no reason to expect F11 to need splitting where D didn't.
+
 ## 2026-10-12 — R_F6, R_F3, F11 defined, before any run
 
 **Source correction**: the native-tool-template model list below is
