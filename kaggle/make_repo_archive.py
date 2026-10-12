@@ -46,8 +46,12 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 1
 
+    # Stale = main has commits this revision does not contain AND they touch
+    # experiment code/data. (Changes made on THIS branch are not staleness.)
     try:
-        changed = git("diff", "--stat", commit, args.main_branch, "--", *CODE_PATHS, cwd=repo)
+        main_in_rev = subprocess.run(["git", "merge-base", "--is-ancestor", args.main_branch, commit],
+                                     cwd=repo).returncode == 0
+        changed = "" if main_in_rev else git("diff", "--stat", commit, args.main_branch, "--", *CODE_PATHS, cwd=repo)
     except subprocess.CalledProcessError:
         changed = ""
         print(f"note: branch {args.main_branch!r} not found; skipping staleness check", file=sys.stderr)
