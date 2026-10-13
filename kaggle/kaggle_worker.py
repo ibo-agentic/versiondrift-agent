@@ -127,6 +127,14 @@ def quarantine_partial(repo: Path, protocol: str, model: str, suite: str, log: L
         log(f"moved incomplete earlier attempt to {dest}")
 
 
+def remove_model_files(models_dir: Path, files) -> None:
+    """Delete a bundle's GGUF file(s) and any half-downloaded .part, so the
+    temporary disk never holds more than the model(s) currently in use."""
+    for f in files:
+        (models_dir / f.filename).unlink(missing_ok=True)
+        (models_dir / (f.filename + ".part")).unlink(missing_ok=True)
+
+
 def claim(state_dir: Path, name: str, gpu: str) -> bool:
     d = state_dir / "claims" / name
     try:
@@ -156,6 +164,11 @@ def main(argv=None) -> int:
         print("CUDA_VISIBLE_DEVICES must name exactly one GPU for a worker", file=sys.stderr)
         return 2
     repo, models_dir = Path(args.repo), Path(args.models_dir)
+    # GGUFs must live on temporary disk. /kaggle/working is the saved-output
+    # area (about 20 GB limit) and only result zips/logs belong there.
+    if "/kaggle/working" in models_dir.resolve().as_posix():
+        print(f"refusing: --models-dir {models_dir} is inside /kaggle/working", file=sys.stderr)
+        return 2
     state_dir, export_dir = Path(args.state_dir), Path(args.export_dir)
     log = Log(state_dir / f"worker_gpu{gpu}.log", f"gpu{gpu}")
     progress = export_dir / f"progress_gpu{gpu}.jsonl"
@@ -179,48 +192,47 @@ def main(argv=None) -> int:
             continue
         log(f"[{b.name}] claimed; {len(todo)} runs to do")
         try:
-            records = [download_and_verify(f, models_dir, log) for f in b.files]
-        except Exception as exc:  # noqa: BLE001
-            log(f"[{b.name}] MODEL UNAVAILABLE, skipping bundle: {exc}")
-            n_fail += len(todo)
-            continue
-        sources = {"quant": b.quant, "files": records, "repo_commit": args.repo_commit}
-        src_json = state_dir / f"sources__{b.name}.json"
-        src_json.write_text(json.dumps(sources, indent=2, sort_keys=True), encoding="utf-8")
-        gguf = str(models_dir / b.files[0].filename)
+            try:
+                records = [download_and_verify(f, models_dir, log) for f in b.files]
+            except Exception as exc:  # noqa: BLE001
+                log(f"[{b.name}] MODEL UNAVAILABLE, skipping bundle: {exc}")
+                n_fail += len(todo)
+                continue  # finally below removes any partial download
+            sources = {"quant": b.quant, "files": records, "repo_commit": args.repo_commit}
+            src_json = state_dir / f"sources__{b.name}.json"
+            src_json.write_text(json.dumps(sources, indent=2, sort_keys=True), encoding="utf-8")
+            gguf = str(models_dir / b.files[0].filename)
 
-        for protocol, suite in todo:
-            if time.time() > args.deadline_epoch or time.time() + 1.25 * longest > args.hard_limit_epoch:
-                log(f"[{b.name}] time budget reached; not starting {protocol}/{suite} "
-                    f"(longest run so far {longest:.0f}s)")
-                stopped_for_time = True
+            for protocol, suite in todo:
+                if time.time() > args.deadline_epoch or time.time() + 1.25 * longest > args.hard_limit_epoch:
+                    log(f"[{b.name}] time budget reached; not starting {protocol}/{suite} "
+                        f"(longest run so far {longest:.0f}s)")
+                    stopped_for_time = True
+                    break
+                quarantine_partial(repo, protocol, b.model_key, suite, log)
+                t0 = time.perf_counter()
+                log(f"[{protocol}/{b.model_key}/{suite}] launching")
+                proc = subprocess.run(
+                    [sys.executable, str(HERE / "kaggle_run_one.py"), "--repo", str(repo), "--protocol", protocol,
+                     "--model", b.model_key, "--suite", suite, "--gguf", gguf, "--sources-json", str(src_json)],
+                    cwd=str(repo), env=dict(os.environ),
+                )
+                elapsed = time.perf_counter() - t0
+                longest = max(longest, elapsed)
+                if proc.returncode == 0 and is_done(repo, protocol, b.model_key, suite):
+                    z = make_run_zip(repo, protocol, b.model_key, suite, export_dir)
+                    n_ok += 1
+                    log(f"[{protocol}/{b.model_key}/{suite}] OK in {elapsed:.0f}s -> {z.name}")
+                    with open(progress, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps({"utc": now(), "protocol": protocol, "model": b.model_key, "suite": suite,
+                                             "gpu": gpu, "elapsed_seconds": elapsed, "zip": z.name}) + "\n")
+                else:
+                    n_fail += 1
+                    log(f"[{protocol}/{b.model_key}/{suite}] FAILED (exit {proc.returncode}); will be retried on next launch")
+            if stopped_for_time:
                 break
-            quarantine_partial(repo, protocol, b.model_key, suite, log)
-            t0 = time.perf_counter()
-            log(f"[{protocol}/{b.model_key}/{suite}] launching")
-            proc = subprocess.run(
-                [sys.executable, str(HERE / "kaggle_run_one.py"), "--repo", str(repo), "--protocol", protocol,
-                 "--model", b.model_key, "--suite", suite, "--gguf", gguf, "--sources-json", str(src_json)],
-                cwd=str(repo), env=dict(os.environ),
-            )
-            elapsed = time.perf_counter() - t0
-            longest = max(longest, elapsed)
-            if proc.returncode == 0 and is_done(repo, protocol, b.model_key, suite):
-                z = make_run_zip(repo, protocol, b.model_key, suite, export_dir)
-                n_ok += 1
-                log(f"[{protocol}/{b.model_key}/{suite}] OK in {elapsed:.0f}s -> {z.name}")
-                with open(progress, "a", encoding="utf-8") as fh:
-                    fh.write(json.dumps({"utc": now(), "protocol": protocol, "model": b.model_key, "suite": suite,
-                                         "gpu": gpu, "elapsed_seconds": elapsed, "zip": z.name}) + "\n")
-            else:
-                n_fail += 1
-                log(f"[{protocol}/{b.model_key}/{suite}] FAILED (exit {proc.returncode}); will be retried on next launch")
-        if stopped_for_time:
-            for f in b.files:
-                (models_dir / f.filename).unlink(missing_ok=True)
-            break
-        for f in b.files:  # free disk for the next bundle
-            (models_dir / f.filename).unlink(missing_ok=True)
+        finally:  # always: only the model(s) of the bundle in progress may occupy temp disk
+            remove_model_files(models_dir, b.files)
     pending = [f"{p}/{m}/{s}" for p, m, s in plan.all_jobs(tuple(args.phases)) if not is_done(repo, p, m, s)]
     log(f"worker done: {n_ok} runs ok, {n_fail} failed/skipped this session; "
         f"{'stopped for time budget; ' if stopped_for_time else ''}{len(pending)} runs still pending overall")

@@ -14,6 +14,7 @@ Nothing here has been run on a model. The notebook is built, not run.
 | `kaggle_plan.py` | The run list, model sources and expected SHA-256s. Single source of truth. |
 | `kaggle_worker.py` | One process per GPU: claim a model, download + verify, run, zip, delete the model. |
 | `kaggle_run_one.py` | One (protocol, model, suite) run; builds the config with the laptop's own `build_config`. |
+| `kaggle_install.py` | Installs the pinned llama-cpp-python: from an attached wheel if present, else builds and saves the wheel. |
 | `kaggle_session.py` | Notebook helpers: locate repo, restore earlier runs, launch/monitor workers. |
 | `kaggle_verify.py` | Checks one exported run zip (used by the Kaggle restore step and by the laptop import). |
 | `make_repo_archive.py` | Builds the code archive for the Kaggle dataset from a git commit. |
@@ -77,17 +78,34 @@ only if it passes (DEVIATIONS draft: each run's greedy score and parse rate with
 set `RUN_GROUP = "f5"` / `"r_f5"` (or `"all"`) for the next sessions. Groups can be run in any order and
 resumed; a model needed by both `f5` and `r_f5` is downloaded again per session.
 
-Disk: Q8_0 files are 8-9 GB each. Each worker downloads one model, runs all of that model's suites, then deletes
-it. GGUFs go to `/kaggle/temp`, results to `/kaggle/working`.
+Disk: Q8_0 files are 8-9 GB each, so they never touch `/kaggle/working` (saved output, about 20 GB limit).
+GGUFs go to `/kaggle/temp/models` (temporary disk; `/tmp/models` if that does not exist). A worker downloads a
+model only when it has runs to do for it, hash-verifies it, runs all of that model's suites, then deletes it (and
+any partial download, even after an error) before taking the next one. At most one model per GPU is on disk, so
+2 x ~9 GB at a time. The worker refuses to start if `--models-dir` is inside `/kaggle/working`. Only these go to
+`/kaggle/working`: the repo copy (small), `results_v2/` run folders, `export/` zips, `state/` logs, `wheels/`.
 
-### Pinned llama-cpp-python
+### Pinned llama-cpp-python, and reusing the built wheel
 
 The laptop used `llama-cpp-python==0.3.35` (every `run_manifest.json`:
 `model_backend.llama_cpp_python_version`; `requirements.txt` itself only says `>=0.2.90`).
-The notebook installs exactly `0.3.35` with `CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=75"`
-and asserts the version and `llama_supports_gpu_offload()`. If that fails the notebook stops with an
-error; it does **not** install another version. Every exported run is verified again on import
-(`llama_cpp_python_version` must equal `0.3.35`).
+
+* **Session 1 (no wheel attached):** cell 4 builds exactly `0.3.35` from source with
+  `CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=75"` (`pip wheel`, 10-20 min), installs it,
+  checks the version and `llama_supports_gpu_offload()` in a fresh interpreter, and saves
+  `/kaggle/working/wheels/llama_cpp_python-0.3.35-<python tag>-linux_x86_64.whl` plus `WHEEL_INFO.json`
+  (sha256, python, nvcc, cmake args).
+* **Keep the wheel:** download both files from the notebook's Output / file panel at the end of session 1
+  (or from the saved version's Output). Kaggle -> Datasets -> New dataset -> upload the `.whl` (and
+  `WHEEL_INFO.json`), visibility **Private**, e.g. named `llama-cpp-wheel`.
+* **Later sessions:** Add Input -> that dataset (next to the code dataset). Cell 4 searches `/kaggle/input`
+  for `llama_cpp_python-0.3.35-*.whl` (file-name version must be exactly `0.3.35`; a `0.3.36` wheel is
+  ignored), installs it with pip, and verifies the version and GPU offload; no build happens.
+* **If the attached wheel does not fit** (Kaggle's image moved to another Python, e.g. `cp311` vs `cp312`, or
+  CUDA libraries changed) it is reported and cell 4 falls back to building `0.3.35` again, then saves a new
+  wheel. It never installs another version: on any failure the notebook stops with an error.
+
+Every exported run is verified again on import (`llama_cpp_python_version` must equal `0.3.35`).
 Same llama.cpp source as the laptop wheel; the compile target and CUDA toolkit differ (T4/sm_75, Linux).
 That difference is what the hardware check measures.
 
