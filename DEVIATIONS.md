@@ -4,6 +4,43 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-13 — F11 vs D: the differing manifest fields, one by one (and one real second difference)
+
+Checked directly on all 18 completed F11 runs against the matching D runs (6 models x 3 suites, `run_manifest.json`,
+every key compared except `run_id`, `created_utc`, `config_path`). The 2026-10-13 entry above says "7 fields"; the
+precise result is **7 fields for the three Qwen models and 5 for the three Mistral models** (the Mistral GGUFs'
+`native_eot_token` and `native_model_wants_bos` are the same in D and F11), the 5 being a subset of the 7. The same
+7 keys, with values (Mistral v0.1/v0.2/v0.3 | Qwen2/2.5/3):
+
+| # | field | D -> F11 | follows automatically from `chat_wrapping`? | could it change model output on its own? |
+|---|---|---|---|---|
+| 1 | `run_factors.F11_chat_wrapping` | `native` -> `legacy` (all 6) | It **is** the change: the config key `model.chat_wrapping`, echoed. | Yes: it selects the whole prompt-construction path. This is the one intended change. |
+| 2 | `model_backend.chat_wrapping` | `native` -> `legacy` (all 6) | Same config key, echoed by the client (a second record of change #1). | Same as #1 (not an additional change). |
+| 3 | `model_backend.native_chat_template_found` | `true` -> `false` (all 6) | Yes: it records "the native formatter was built"; legacy never builds one, so it is `false` even though the GGUF still contains a template. | No: a log value; nothing reads it during generation. |
+| 4 | `model_backend.native_bos_token` | `"<s>"` (Mistral) / `"<\|endoftext\|>"` (Qwen) -> `""` | Yes: only read from the formatter in the native branch. | No: used only by the native path's BOS resolution, which legacy does not run. |
+| 5 | `model_backend.native_stop_tokens` | `["</s>"]` (Mistral) / `["<\|im_end\|>"]` (Qwen) -> `[]` | **Partly.** The list is derived from the template only in native mode, so it is empty in legacy. But it is not a log-only field: in native mode it is merged into the `stop=` strings sent to the model, and F11's config sets no `stop`. **This is a real second difference in the call** (see below). | In principle yes (a stop string is a generation parameter). In practice no evidence: see below. |
+| 6 | `model_backend.native_eot_token` | Qwen: `"<\|im_end\|>"` -> `""`; Mistral: `""` in both | Yes: computed only while building the native formatter; legacy leaves the default. | No: it is only an input to #5. |
+| 7 | `model_backend.native_model_wants_bos` | Qwen: `false` -> `true`; Mistral: `true` in both | Yes: native computes it from the GGUF; legacy leaves the `__init__` default (`True`), which nothing reads on the legacy path. The logged `true` does **not** mean a BOS was added. | No: unused under legacy. (How BOS is handled under legacy, llama.cpp's own tokenizer rules for a string prompt, is part of the wrapping mechanism, not of this field.) |
+
+**Plainly: field #5 is a real second difference, not a pure consequence of the wrapping change.** D (native)
+sends `stop=["</s>"]` / `["<|im_end|>"]` derived from the model's template. F11's config has the legacy
+`prompt_template` but **no `stop`**, whereas every historical legacy config in this repo
+(`configs/real_trials_*.yaml`, `bfcl_trials_*.yaml`) set `stop: ["</s>"]` or `["<|im_end|>"]`. So F11 is "legacy
+wrapping without the old stop strings", not exactly the old legacy setup, and it differs from D in one call
+parameter beyond the wrapping text. Why it is expected to be harmless: llama.cpp's generation loop already halts on
+any end-of-generation token at token-ID level (`llama_vocab_is_eog`; `</s>` and `<|im_end|>` are EOG tokens for these
+models), so the text-level stop string is a redundant backstop (see the docstring of `build_native_stop_list`).
+Empirical check: of the 16,200 recorded F11 outputs (6 models x 3 suites x 900), **0** contain `</s>`,
+`<|im_end|>`, `<|endoftext|>`, `[/INST]` or `<|im_start|>`. This is not a proof that no output differs, only that no
+sign of the stop strings having mattered is present. Treat F11 as "legacy wrapping, stop strings left to the EOS
+token" in any write-up, and do not describe it as a one-field change. Re-running F11 with the historical `stop`
+added would remove the question; not done.
+
+Config-level differences that are not manifest fields (checked in the generated configs): `model.prompt_template`
+(the legacy wrapper itself, i.e. the change), and `model.thinking: default` written explicitly (identical to
+omitting it: `LlamaCppClient` reads `thinking` with default `"default"`). Nothing else differs: seed, trial seeds/temperatures, `max_tokens` 256,
+`prompt_format: shared`, `constrained_decoding: off`, `n_ctx` 4096, task files and perturbations are identical.
+
 ## 2026-10-13 — F11/R_F6/R_F3 complete: checks pass, F11's manifest diff explained
 
 All 42 runs completed. **R_F6 greedy check**: every trial-0 record
