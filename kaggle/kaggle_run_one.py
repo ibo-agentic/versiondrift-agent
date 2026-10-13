@@ -84,9 +84,24 @@ def hardware_info() -> dict:
         "cpu": cpu_model or platform.processor(),
         "cpu_count": os.cpu_count(),
         "kernel": platform.platform(),
+        "cuda_runtime_source": os.environ.get("KAGGLE_CUDA_RUNTIME_SOURCE"),
+        "python_executable": sys.executable,
         "kaggle_kernel_run_type": os.environ.get("KAGGLE_KERNEL_RUN_TYPE"),
         "kaggle_docker_image": os.environ.get("KAGGLE_DOCKER_IMAGE") or os.environ.get("KAGGLE_IMAGE_VERSION"),
     }
+
+
+def _package_versions() -> dict:
+    import importlib.metadata as md
+
+    out = {}
+    for name in ("llama-cpp-python", "numpy", "jinja2", "markupsafe", "diskcache", "typing-extensions", "PyYAML",
+                 "nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12"):
+        try:
+            out[name] = md.version(name)
+        except md.PackageNotFoundError:
+            out[name] = None
+    return out
 
 
 def _write_json(path: Path, data: dict) -> None:
@@ -187,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
             "started_utc": started,
             "elapsed_seconds": elapsed,
             "python": platform.python_version(),
+            "package_versions": _package_versions(),
         }
         _write_json(mpath, manifest)
 

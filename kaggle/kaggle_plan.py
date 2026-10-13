@@ -23,6 +23,34 @@ from dataclasses import dataclass, field
 # string after install and stops otherwise -- it never swaps versions.
 LLAMA_CPP_PYTHON_VERSION = "0.3.35"
 
+# The laptop's interpreter (.venv/pyvenv.cfg: uv-managed CPython 3.12.12).
+LAPTOP_PYTHON = "3.12.12"
+
+# The llama.cpp build the laptop actually runs. Established 2026-10-13 by
+# comparing the laptop's installed llama_cpp_python-0.3.35.dist-info/RECORD
+# with abetlen's release wheels: bin/ggml-cuda.dll (sha256 dQ7dsW7z...),
+# llama.dll, ggml-base.dll and ggml-cpu.dll are byte-identical to the
+# **v0.3.35-cu125** Windows wheel (NOT cu124, whose ggml-cuda.dll differs).
+# The Linux wheel of the same release is built by the same workflow (same
+# flags: GGML_CUDA_FORCE_MMQ=ON, archs 60..90 incl. 75, AVX2/FMA/F16C off).
+# sha256/size are GitHub's published asset digest for that release asset.
+LLAMA_WHEEL = {
+    "url": "https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35-cu125/"
+           "llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl",
+    "filename": "llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl",
+    "sha256": "3b12c0188e1d90880d59645fd026e262f0f828ae5078df2a4a44a4801ea059d2",
+    "size": 1676663334,
+}
+
+# Package versions of the laptop's .venv (dist-info), pinned on Kaggle so that
+# e.g. jinja2 (chat-template rendering) and numpy match. CUDA runtime libs the
+# laptop loads are the pip nvidia-* packages below.
+LAPTOP_PINS = (
+    "numpy==2.5.3", "diskcache==5.6.3", "jinja2==3.1.6", "markupsafe==3.0.3",
+    "typing-extensions==4.16.0", "PyYAML==6.0.3",
+)
+LAPTOP_CUDA_PINS = ("nvidia-cuda-runtime-cu12==12.9.79", "nvidia-cublas-cu12==12.9.2.10")
+
 SEED = 1234
 SUITES = ("synthetic", "bfcl_simple", "bfcl_multiple")
 EXPECTED_RECORDS_PER_RUN = 900  # 100 tasks x 3 conditions x 3 trials

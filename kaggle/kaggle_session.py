@@ -139,14 +139,15 @@ def restore_from_inputs(repo: Path, export_dir: Path, input_root: str | Path = "
 # ------------------------------------------------------------------- launch
 def launch_workers(repo: Path, models_dir: Path, state_dir: Path, export_dir: Path, phases, deadline_epoch: float,
                    repo_commit: str | None, gpus=("0", "1"),
-                   hard_limit_epoch: float | None = None) -> list[subprocess.Popen]:
+                   hard_limit_epoch: float | None = None, python: str | None = None,
+                   extra_env: dict | None = None) -> list[subprocess.Popen]:
     shutil.rmtree(state_dir / "claims", ignore_errors=True)  # claims are per session
     state_dir.mkdir(parents=True, exist_ok=True)
     procs = []
     for g in gpus:
-        env = dict(os.environ, CUDA_VISIBLE_DEVICES=g)
+        env = dict(os.environ, **(extra_env or {}), CUDA_VISIBLE_DEVICES=g)
         out = open(state_dir / f"stdout_gpu{g}.log", "a", encoding="utf-8")
-        cmd = [sys.executable, str(HERE / "kaggle_worker.py"), "--repo", str(repo), "--models-dir", str(models_dir),
+        cmd = [python or sys.executable, str(HERE / "kaggle_worker.py"), "--repo", str(repo), "--models-dir", str(models_dir),
                "--state-dir", str(state_dir), "--export-dir", str(export_dir), "--phases", *phases,
                "--deadline-epoch", str(deadline_epoch)]
         if hard_limit_epoch:

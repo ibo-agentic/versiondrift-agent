@@ -16,79 +16,181 @@ import kaggle_plan as plan  # noqa: E402
 import kaggle_worker as kw  # noqa: E402
 
 
-# ---------------------------------------------------------------- wheels
-def test_wheel_version_parsing():
-    assert ki.wheel_version("llama_cpp_python-0.3.35-cp312-cp312-linux_x86_64.whl") == "0.3.35"
-    assert ki.wheel_python_tag("llama_cpp_python-0.3.35-cp312-cp312-linux_x86_64.whl") == "cp312"
-    assert ki.wheel_version("numpy-1.0-py3-none-any.whl") is None
+# ------------------------------------------------- environment / wheel
+def test_plan_wheel_is_the_laptops_build():
+    w = plan.LLAMA_WHEEL
+    assert plan.LAPTOP_PYTHON == "3.12.12"
+    assert "v0.3.35-cu125" in w["url"] and w["url"].endswith(w["filename"])
+    assert "manylinux" in w["filename"] and "0.3.35" in w["filename"]
+    assert len(w["sha256"]) == 64 and int(w["sha256"], 16) >= 0 and w["size"] > 1_000_000_000
+    assert "numpy==2.5.3" in plan.LAPTOP_PINS and "jinja2==3.1.6" in plan.LAPTOP_PINS
 
 
-def test_find_wheels_exact_version_only_and_python_tag_first(tmp_path):
+def test_check_python():
+    import pytest
+
+    assert ki.check_python("3.12.12", "3.12.12") is None
+    with pytest.raises(RuntimeError, match="laptop runs 3.12.12"):
+        ki.check_python("3.13.15", "3.12.12")
+    warn = ki.check_python("3.13.15", "3.12.12", allow_mismatch=True)
+    assert "ALLOW_PYTHON_MISMATCH" in warn
+
+
+def test_find_wheels_exact_version_only(tmp_path):
     d = tmp_path / "input" / "llama-cpp-wheel"
     d.mkdir(parents=True)
-    tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
-    for name in (f"llama_cpp_python-0.3.35-cp39-cp39-linux_x86_64.whl",
-                 f"llama_cpp_python-0.3.35-{tag}-{tag}-linux_x86_64.whl",
-                 f"llama_cpp_python-0.3.36-{tag}-{tag}-linux_x86_64.whl",
-                 "llama_cpp_python-0.3.3-cp312-cp312-linux_x86_64.whl"):
+    for name in ("llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl",
+                 "llama_cpp_python-0.3.36-py3-none-manylinux_2_35_x86_64.whl",
+                 "llama_cpp_python-0.3.3-py3-none-manylinux_2_35_x86_64.whl"):
         (d / name).write_bytes(b"x")
     found = ki.find_wheels(tmp_path / "input", "0.3.35")
-    assert [p.name for p in found] == [f"llama_cpp_python-0.3.35-{tag}-{tag}-linux_x86_64.whl",
-                                       "llama_cpp_python-0.3.35-cp39-cp39-linux_x86_64.whl"] or tag == "cp39"
-    assert all(ki.wheel_version(p.name) == "0.3.35" for p in found)
+    assert [p.name for p in found] == ["llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl"]
     assert ki.find_wheels(tmp_path / "nowhere", "0.3.35") == []
 
 
-def test_attached_wheel_is_installed_and_nothing_is_built(tmp_path, monkeypatch):
-    tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
-    w = tmp_path / "in" / f"llama_cpp_python-0.3.35-{tag}-{tag}-linux_x86_64.whl"
-    w.parent.mkdir()
-    w.write_bytes(b"x")
-    calls = []
+class FakeToolchain:
+    """Stands in for uv/pip/the venv interpreter; records every command."""
 
-    def fake_pip(*args, env=None):
-        calls.append(args)
-        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+    def __init__(self, tmp_path, python_version="3.12.12", pip_wheel_works=True, venv_works=True):
+        self.cmds, self.tmp = [], tmp_path
+        self.python_version, self.pip_wheel_works, self.venv_works = python_version, pip_wheel_works, venv_works
 
-    monkeypatch.setattr(ki, "_pip", fake_pip)
-    monkeypatch.setattr(ki, "verify_in_fresh_interpreter", lambda v: (True, f"llama-cpp-python {v} with GPU offload"))
-    res = ki.ensure_llama_cpp("0.3.35", input_root=tmp_path / "in", wheel_out_dir=tmp_path / "out")
-    assert res["how"] == "installed from attached wheel"
-    assert [c[0] for c in calls] == ["install"]          # no `pip wheel` build
-    assert not (tmp_path / "out").exists()
+    def run(self, cmd, env=None, timeout=None):
+        self.cmds.append((list(cmd), env))
+        ok = types.SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[:2] == ["uv", "venv"]:
+            if not self.venv_works:
+                return types.SimpleNamespace(returncode=1, stdout="", stderr="no python")
+            py = Path(cmd[-1]) / "bin" / "python"
+            py.parent.mkdir(parents=True, exist_ok=True)
+            py.write_bytes(b"")
+            return ok
+        if len(cmd) >= 3 and cmd[1] == "-c" and "sys.version" in cmd[2]:
+            return types.SimpleNamespace(returncode=0, stdout=self.python_version + "\n", stderr="")
+        if cmd[1:3] == ["-m", "pip"] and cmd[3] == "wheel":
+            if not self.pip_wheel_works:
+                return types.SimpleNamespace(returncode=1, stdout="", stderr="nvcc: unsupported GNU version")
+            out = Path(cmd[cmd.index("-w") + 1])
+            (out / "llama_cpp_python-0.3.35-py3-none-linux_x86_64.whl").write_bytes(b"built")
+        return ok
 
-
-def test_unusable_wheel_falls_back_to_building_same_version_only(tmp_path, monkeypatch):
-    tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
-    w = tmp_path / "in" / f"llama_cpp_python-0.3.35-{tag}-{tag}-linux_x86_64.whl"
-    w.parent.mkdir()
-    w.write_bytes(b"x")
-    seen = []
-
-    def fake_pip(*args, env=None):
-        seen.append(args)
-        if args[0] == "wheel":
-            outdir = Path(args[args.index("-w") + 1])
-            assert args[1] == "llama-cpp-python==0.3.35" and env["CMAKE_ARGS"] == ki.BUILD_CMAKE_ARGS
-            (outdir / f"llama_cpp_python-0.3.35-{tag}-{tag}-linux_x86_64.whl").write_bytes(b"built")
-        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
-
-    results = iter([(False, "bad abi"), (True, "ok")])  # attached wheel fails verify, built wheel passes
-    monkeypatch.setattr(ki, "_pip", fake_pip)
-    monkeypatch.setattr(ki, "verify_in_fresh_interpreter", lambda v: next(results))
-    res = ki.ensure_llama_cpp("0.3.35", input_root=tmp_path / "in", wheel_out_dir=tmp_path / "out")
-    assert res["how"] == "built from source"
-    assert Path(res["wheel"]).parent == tmp_path / "out" and Path(res["wheel"]).exists()
-    info = json.loads((tmp_path / "out" / "WHEEL_INFO.json").read_text())
-    assert info["version"] == "0.3.35" and len(info["sha256"]) == 64
+    def kinds(self):
+        out = []
+        for c, _ in self.cmds:
+            if c[:2] == ["uv", "venv"]:
+                out.append("venv")
+            elif c[:3] == ["uv", "pip", "install"]:
+                out.append("uv-install")
+            elif c[1:3] == ["-m", "pip"] and c[3] == "wheel":
+                out.append("source-build")
+        return out
 
 
-def test_failure_never_substitutes_a_version(tmp_path, monkeypatch):
+def _patch_env(monkeypatch, tc, wheel_ok=True, verify_results=None):
+    monkeypatch.setattr(ki, "_run", tc.run)
+    monkeypatch.setattr(ki.shutil, "which", lambda name: "uv")
+    monkeypatch.setattr(ki, "nvidia_lib_dirs", lambda py: ["/venv/site-packages/nvidia/cublas/lib"])
+    calls = {"download": 0}
+
+    def fake_download(spec, dest, log=print):
+        calls["download"] += 1
+        if not wheel_ok:
+            raise RuntimeError("github unreachable")
+        dest.mkdir(parents=True, exist_ok=True)
+        p = dest / spec["filename"]
+        p.write_bytes(b"w")
+        return p
+
+    monkeypatch.setattr(ki, "download_wheel", fake_download)
+    results = iter(verify_results or [(True, "python 3.12.12, llama-cpp-python 0.3.35 with GPU offload", {})])
+    monkeypatch.setattr(ki, "verify", lambda py, v, extra=None: next(results))
+    return calls
+
+
+def _build(tmp_path, **kw):
+    return ki.build_env("0.3.35", venv_dir=str(tmp_path / "venv"), work_dir=str(tmp_path / "dl"),
+                        input_root=str(tmp_path / "in"), wheel_out_dir=str(tmp_path / "out"),
+                        log=lambda *_: None, **kw)
+
+
+def test_release_wheel_path_creates_laptop_python_venv_and_never_compiles(tmp_path, monkeypatch):
+    tc = FakeToolchain(tmp_path)
+    calls = _patch_env(monkeypatch, tc)
+    env = _build(tmp_path)
+    assert tc.kinds() == ["venv", "uv-install", "uv-install"]   # pins, then the wheel; no source build
+    venv_cmd = tc.cmds[0][0]
+    assert venv_cmd[:2] == ["uv", "venv"] and venv_cmd[venv_cmd.index("--python") + 1] == "3.12.12"
+    pins_cmd = next(c for c, _ in tc.cmds if c[:3] == ["uv", "pip", "install"])
+    assert "numpy==2.5.3" in pins_cmd and "nvidia-cublas-cu12==12.9.2.10" in pins_cmd
+    wheel_cmd = [c for c, _ in tc.cmds if c[:3] == ["uv", "pip", "install"]][1]
+    assert "--no-deps" in wheel_cmd and wheel_cmd[-1].endswith("manylinux_2_35_x86_64.whl")
+    assert calls["download"] == 1
+    assert "pip nvidia" in env.env["KAGGLE_CUDA_RUNTIME_SOURCE"] and "cublas/lib" in env.env["LD_LIBRARY_PATH"]
+    assert env.info["how"].startswith("release wheel")
+
+
+def test_falls_back_to_system_cuda_libs_when_pip_libs_do_not_verify(tmp_path, monkeypatch):
+    tc = FakeToolchain(tmp_path)
+    _patch_env(monkeypatch, tc, verify_results=[(False, "libcublas not found", {}), (True, "ok", {})])
+    env = _build(tmp_path)
+    assert env.env["KAGGLE_CUDA_RUNTIME_SOURCE"].startswith("system CUDA")
+    assert any("failed" in n for n in env.info["notes"])
+
+
+def test_wrong_python_stops_with_clear_message(tmp_path, monkeypatch):
     import pytest
 
-    monkeypatch.setattr(ki, "_pip", lambda *a, env=None: types.SimpleNamespace(returncode=1, stdout="", stderr="boom"))
+    tc = FakeToolchain(tmp_path, python_version="3.13.15")
+    _patch_env(monkeypatch, tc)
+    with pytest.raises(RuntimeError, match="laptop runs 3.12.12"):
+        _build(tmp_path)
+    assert "uv-install" not in tc.kinds()    # stopped before installing anything
+
+
+def test_python_mismatch_can_be_accepted_explicitly(tmp_path, monkeypatch):
+    tc = FakeToolchain(tmp_path, python_version="3.13.15")
+    _patch_env(monkeypatch, tc)
+    env = _build(tmp_path, allow_python_mismatch=True)
+    assert any("ALLOW_PYTHON_MISMATCH" in n for n in env.info["notes"])
+
+
+def test_venv_creation_failure_does_not_fall_back_to_kaggle_python(tmp_path, monkeypatch):
+    import pytest
+
+    tc = FakeToolchain(tmp_path, venv_works=False)
+    _patch_env(monkeypatch, tc)
+    with pytest.raises(RuntimeError, match="not used silently"):
+        _build(tmp_path)
+
+
+def test_unreachable_release_wheel_builds_same_version_with_workflow_flags(tmp_path, monkeypatch):
+    tc = FakeToolchain(tmp_path)
+    _patch_env(monkeypatch, tc, wheel_ok=False)
+    env = _build(tmp_path)
+    assert env.info["how"].startswith("built from source")
+    cmd, e = next((c, e) for c, e in tc.cmds if c[1:3] == ["-m", "pip"] and c[3] == "wheel")
+    assert "llama-cpp-python==0.3.35" in cmd
+    assert "-DGGML_CUDA_FORCE_MMQ=ON" in e["CMAKE_ARGS"] and "-allow-unsupported-compiler" in e["CMAKE_ARGS"]
+    assert (tmp_path / "out" / "WHEEL_INFO.json").exists()
+
+
+def test_everything_failing_raises_without_substituting_a_version(tmp_path, monkeypatch):
+    import pytest
+
+    tc = FakeToolchain(tmp_path, pip_wheel_works=False)
+    _patch_env(monkeypatch, tc, wheel_ok=False)
     with pytest.raises(RuntimeError, match="NOT substituting"):
-        ki.ensure_llama_cpp("0.3.35", input_root=tmp_path / "in", wheel_out_dir=tmp_path / "out")
+        _build(tmp_path)
+
+
+def test_attached_wheel_dataset_is_preferred_over_download(tmp_path, monkeypatch):
+    d = tmp_path / "in" / "wheel-ds"
+    d.mkdir(parents=True)
+    (d / "llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl").write_bytes(b"x")
+    tc = FakeToolchain(tmp_path)
+    calls = _patch_env(monkeypatch, tc)
+    env = _build(tmp_path)
+    assert calls["download"] == 0 and env.info["how"] == "attached wheel dataset"
 
 
 # ----------------------------------------------------- GGUF temp-disk rules

@@ -14,7 +14,7 @@ Nothing here has been run on a model. The notebook is built, not run.
 | `kaggle_plan.py` | The run list, model sources and expected SHA-256s. Single source of truth. |
 | `kaggle_worker.py` | One process per GPU: claim a model, download + verify, run, zip, delete the model. |
 | `kaggle_run_one.py` | One (protocol, model, suite) run; builds the config with the laptop's own `build_config`. |
-| `kaggle_install.py` | Installs the pinned llama-cpp-python: from an attached wheel if present, else builds and saves the wheel. |
+| `kaggle_install.py` | Builds the run environment: uv venv with Python 3.12.12, the laptop's package pins, the v0.3.35-cu125 Linux wheel (verified), CUDA-runtime choice. |
 | `kaggle_session.py` | Notebook helpers: locate repo, restore earlier runs, launch/monitor workers. |
 | `kaggle_verify.py` | Checks one exported run zip (used by the Kaggle restore step and by the laptop import). |
 | `make_repo_archive.py` | Builds the code archive for the Kaggle dataset from a git commit. |
@@ -70,7 +70,7 @@ Use B only if you want to change code without re-uploading a dataset. The branch
 1. New notebook -> File -> Import notebook -> `f5_runner.ipynb`.
 2. Settings: Accelerator **GPU T4 x2**, Internet **On**.
 3. Add the code dataset as Input.
-4. Run all. Order: llama-cpp-python build (10-20 min), hardware check, F5, R_F5.
+4. Run all. Cell 4 sets up the environment (uv venv + 1.7 GB wheel download, a few minutes; no compile), then the chosen `RUN_GROUP` runs.
 
 `RUN_GROUP` (first cell) chooses what a session runs: `hwcheck` (6 runs, the default), `f5` (33 runs),
 `r_f5` (15 runs) or `all`. Session 1 should be `hwcheck` only: import and compare on the laptop (section 5);
@@ -85,29 +85,44 @@ any partial download, even after an error) before taking the next one. At most o
 2 x ~9 GB at a time. The worker refuses to start if `--models-dir` is inside `/kaggle/working`. Only these go to
 `/kaggle/working`: the repo copy (small), `results_v2/` run folders, `export/` zips, `state/` logs, `wheels/`.
 
-### Pinned llama-cpp-python, and reusing the built wheel
+### Python and llama-cpp-python: the laptop's exact environment
 
-The laptop used `llama-cpp-python==0.3.35` (every `run_manifest.json`:
-`model_backend.llama_cpp_python_version`; `requirements.txt` itself only says `>=0.2.90`).
+What the laptop actually runs (read from its `.venv`, not from `requirements.txt`, which only says `>=0.2.90`):
 
-* **Session 1 (no wheel attached):** cell 4 builds exactly `0.3.35` from source with
-  `CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=75"` (`pip wheel`, 10-20 min), installs it,
-  checks the version and `llama_supports_gpu_offload()` in a fresh interpreter, and saves
-  `/kaggle/working/wheels/llama_cpp_python-0.3.35-<python tag>-linux_x86_64.whl` plus `WHEEL_INFO.json`
-  (sha256, python, nvcc, cmake args).
-* **Keep the wheel:** download both files from the notebook's Output / file panel at the end of session 1
-  (or from the saved version's Output). Kaggle -> Datasets -> New dataset -> upload the `.whl` (and
-  `WHEEL_INFO.json`), visibility **Private**, e.g. named `llama-cpp-wheel`.
-* **Later sessions:** Add Input -> that dataset (next to the code dataset). Cell 4 searches `/kaggle/input`
-  for `llama_cpp_python-0.3.35-*.whl` (file-name version must be exactly `0.3.35`; a `0.3.36` wheel is
-  ignored), installs it with pip, and verifies the version and GPU offload; no build happens.
-* **If the attached wheel does not fit** (Kaggle's image moved to another Python, e.g. `cp311` vs `cp312`, or
-  CUDA libraries changed) it is reported and cell 4 falls back to building `0.3.35` again, then saves a new
-  wheel. It never installs another version: on any failure the notebook stops with an error.
+| | Laptop | Kaggle notebook |
+|---|---|---|
+| Python | uv-managed CPython **3.12.12** | a dedicated `uv` venv with exactly `3.12.12` (Kaggle's own Python, e.g. 3.13, is not used for runs) |
+| llama-cpp-python | **0.3.35**, abetlen's `v0.3.35-cu125` Windows wheel | the same release's Linux wheel, **no compiling** |
+| CUDA runtime libs | pip `nvidia-cuda-runtime-cu12 12.9.79`, `nvidia-cublas-cu12 12.9.2.10` | the same pip packages (system CUDA only if those do not verify; recorded) |
+| jinja2 / numpy / ... | 3.1.6 / 2.5.3 / diskcache 5.6.3, markupsafe 3.0.3, PyYAML 6.0.3, typing-extensions 4.16.0 | same pins |
 
-Every exported run is verified again on import (`llama_cpp_python_version` must equal `0.3.35`).
-Same llama.cpp source as the laptop wheel; the compile target and CUDA toolkit differ (T4/sm_75, Linux).
-That difference is what the hardware check measures.
+* Wheel URL: `https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35-cu125/llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl`
+  (1,676,663,334 bytes, SHA-256 `3b12c0188e1d90880d59645fd026e262f0f828ae5078df2a4a44a4801ea059d2`, GitHub's published digest; the notebook verifies both).
+* It is `py3-none`, so it is independent of the Python minor version; Python only matters for the pure-Python parts
+  (jinja2 chat-template rendering, JSON/regex parsing), which is why the venv matches 3.12.12 and the package pins.
+* **Why cu125, not cu124:** the laptop's README says `.../whl/cu124`, but the installed DLLs
+  (`ggml-cuda.dll`, `llama.dll`, `ggml-base.dll`, `ggml-cpu.dll`) have the same SHA-256 as the `v0.3.35-cu125`
+  Windows wheel and differ from the `cu124` one (checked 2026-10-13 against the release assets' `RECORD`).
+  The Linux wheels of that release are built by the same workflow (`GGML_CUDA_FORCE_MMQ=ON`, architectures 60-90
+  including sm_75, AVX2/FMA/F16C off). That is the closest possible match to the laptop on a T4.
+* A source build of 0.3.35 (the old approach) is only a last-resort fallback now, with the workflow's flags. It
+  stops with an error if it fails; the version is never changed.
+* If Python is not 3.12.12 the notebook stops with a message (`ALLOW_PYTHON_MISMATCH=True` in cell 1 overrides it,
+  and the mismatch is then recorded and flagged by the import script).
+
+**Kaggle environment settings.** Notebook Settings has an *Environment* choice ("Pin to original environment" /
+"Always use latest environment"; I could not verify what Python each one carries for your notebook). Kaggle
+notebooks offer no choice of Python 3.11 or of a custom Docker image, so this notebook does not depend on that
+setting: it builds its own interpreter with `uv`. Needs: Internet On (uv downloads CPython from GitHub; the wheel
+comes from GitHub releases; pip packages from PyPI).
+
+**Optional wheel dataset.** If you attach a dataset containing `llama_cpp_python-0.3.35-*.whl`, it is installed
+instead of downloading (version in the file name must be exactly `0.3.35`). Only useful if GitHub is unreachable
+from Kaggle; the wheel is 1.7 GB.
+
+Every exported run is verified again on import (`llama_cpp_python_version` must equal `0.3.35`; the run's
+Python is shown, and flagged if it is not 3.12.12). Each manifest's `kaggle.package_versions` and
+`hardware.cuda_runtime_source` record what was actually used.
 
 ## 3. Saving progress and resuming (12 h sessions)
 
@@ -180,6 +195,6 @@ To change it, edit `Q8_SOURCES` in `kaggle_plan.py` (hash + size) and nothing el
 
 ## Not verified here
 
-* That `llama-cpp-python==0.3.35` compiles against Kaggle's current CUDA image (nothing was built or run).
+* That the cu125 Linux wheel loads on Kaggle's driver/CUDA 12.8 image (nothing was run on Kaggle). If it does not, cell 4 stops with the reason; it then tries the system CUDA libs, then a source build, and never another version.
 * Real T4 speed, hence the number of sessions needed.
 * That Kaggle keeps `/kaggle/working` after a session timeout; hence "download zips as they appear".

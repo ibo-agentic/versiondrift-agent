@@ -162,4 +162,5 @@ def verify_run_zip(zip_path, expected_records: int = plan.EXPECTED_RECORDS_PER_R
         if not (kg.get("task_file") or {}).get("sha256_lf_normalized"):
             P("run_manifest.kaggle.task_file sha256 missing")
         res.info["elapsed_seconds"] = status.get("elapsed_seconds")
+        res.info["python"] = manifest.get("python")  # informational; importer flags != laptop's 3.12.12
     return res

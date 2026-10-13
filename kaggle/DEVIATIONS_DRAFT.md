@@ -17,7 +17,10 @@ hardware check below is needed.
 (the commit is recorded in every manifest as `kaggle.repo_commit`); seed 1234 and trial seeds 1234/1235/1236;
 trial temperatures 0.0/0.7/0.7; task files (SHA-256 recorded, checked on import); perturbations; `max_tokens`
 256 (F5) / 1024 (R_F5); constrained decoding off (F5) / generic_json (R_F5); n_ctx 4096;
-`llama-cpp-python==0.3.35` (the laptop's version, built from source with CUDA for sm_75). Only `model.path`,
+Python 3.12.12 and `llama-cpp-python==0.3.35` as the laptop's exact build (abetlen's `v0.3.35-cu125` wheel; the
+laptop's DLLs are byte-identical to that release's Windows wheel, and the Linux wheel comes from the same build
+workflow), with the laptop's jinja2/numpy pins and CUDA 12.9 runtime libs (`kaggle.package_versions` and
+`hardware.cuda_runtime_source` in each manifest; Kaggle's own Python 3.13 is not used for runs). Only `model.path`,
 `experiment`, `output_dir` and `model.quant_level: Q8_0` differ in the config. Each `run_manifest.json` has a
 `hardware` field (GPU, driver, CUDA, CPU, image) and a `kaggle` field (model source URLs, SHA-256 of every GGUF,
 task-file hash, commit).
