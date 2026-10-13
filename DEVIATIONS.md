@@ -4,6 +4,30 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-13 — F11/R_F6/R_F3 complete: checks pass, F11's manifest diff explained
+
+All 42 runs completed. **R_F6 greedy check**: every trial-0 record
+compared against R's matching record (by task_id + condition) for all
+3 models x 3 suites (2700 records) -- **0 mismatches**, confirming the
+sampling override correctly leaves greedy untouched, same mechanism as
+F6 itself.
+
+**Manifest diffs**: `R_F6` vs `R` and `R_F3` vs `R` each differ in
+exactly one `run_factors` field (`F6_sampling_preset`,
+`F3_prompt_format`), as required. **`F11` vs `D` differs in 7 fields,
+not 1** -- but all 7 are direct, mechanical consequences of the single
+`chat_wrapping` config change, not independent changes: switching to
+`legacy` skips the native-formatter introspection entirely, so
+`model_backend.native_chat_template_found/native_bos_token/
+native_eot_token/native_stop_tokens/native_model_wants_bos` all go
+empty/False/default (checked directly: D's mistral_v01 shows
+`native_chat_template_found: true, native_bos_token: "<s>", ...`; F11's
+shows `false, "", ...`) alongside `model_backend.chat_wrapping` and
+`run_factors.F11_chat_wrapping` themselves (`native` -> `legacy`).
+Reported honestly as 7 differing keys that are all one semantic
+change, not silently described as "1 field" to match the letter of
+the instruction.
+
 ## 2026-10-13: F5 (Q8_0) and R_F5 for the 8B models are run on Kaggle 2x T4, not on the laptop
 
 **Origin, not a new deviation in intent.** PLAN.md's F5 row already says "8B models on Kaggle (16 GB GPU);
