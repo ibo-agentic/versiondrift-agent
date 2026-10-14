@@ -47,6 +47,14 @@ BUILD_CMAKE_ARGS = (
 _WHEEL_RE = re.compile(r"^llama_cpp_python-([^-]+)-([^-]+)-([^-]+)-([^-]+)\.whl$")
 
 
+MAX_PYTHON = (3, 12)
+
+
+def _major_minor(version: str) -> tuple[int, int]:
+    parts = version.split(".")
+    return int(parts[0]), int(parts[1])
+
+
 @dataclass
 class Env:
     python: str
@@ -85,7 +93,11 @@ def check_python(actual: str, expected: str, allow_mismatch: bool = False) -> st
     message, or (allow_mismatch) return a warning string that the caller records."""
     if actual == expected:
         return None
-    msg = (f"Python in the run environment is {actual}, but the laptop runs {expected}. "
+    above = _major_minor(actual) > MAX_PYTHON
+    msg = (f"Python in the run environment is {actual}"
+           + (" (above 3.12: this project runs on 3.12 and llama-cpp-python 0.3.35 must not be installed on a newer one)"
+              if above else "")
+           + f", but the laptop runs {expected}. "
            f"Results must be produced on the laptop's interpreter. "
            + ("Continuing because ALLOW_PYTHON_MISMATCH=True; this is recorded in every manifest."
               if allow_mismatch else
@@ -105,7 +117,7 @@ def nvidia_lib_dirs(python: str) -> list[str]:
 
 def verify(python: str, version: str, extra_env: dict | None = None) -> tuple[bool, str, dict]:
     """Fresh-interpreter check: python version, llama_cpp version, GPU offload."""
-    code = ("import sys, llama_cpp, jinja2, numpy; "
+    code = ("import sys, llama_cpp, jinja2, numpy; llama_cpp.llama_backend_init(); "
             "print(sys.version.split()[0], llama_cpp.__version__, llama_cpp.llama_supports_gpu_offload(), "
             "jinja2.__version__, numpy.__version__)")
     env = dict(os.environ, **(extra_env or {}))
@@ -158,11 +170,17 @@ def build_env(version: str, venv_dir="/kaggle/temp/venv", work_dir="/kaggle/temp
     # 2. dedicated venv with the laptop's exact interpreter
     venv = Path(venv_dir)
     shutil.rmtree(venv, ignore_errors=True)
-    r = _run(["uv", "venv", "--seed", "--python", expected_python, str(venv)])
     py = str(venv / "bin" / "python")
+    r = _run(["uv", "venv", "--seed", "--python", expected_python, str(venv)])
+    if (r.returncode != 0 or not Path(py).exists()) and shutil.which("conda"):
+        # second route: conda's own Python 3.12 (Kaggle images ship conda)
+        notes.append(f"uv could not provide Python {expected_python} ({(r.stderr or r.stdout)[-150:]}); trying conda")
+        shutil.rmtree(venv, ignore_errors=True)
+        r = _run(["conda", "create", "-y", "-q", "-p", str(venv), f"python={expected_python}"])
     if r.returncode != 0 or not Path(py).exists():
-        raise RuntimeError(f"could not create a Python {expected_python} venv with uv: {(r.stderr or r.stdout)[-600:]}. "
-                           "Kaggle's own Python is not used silently; see kaggle/README.md.")
+        raise RuntimeError(f"could not create a Python {expected_python} environment with uv or conda: "
+                           f"{(r.stderr or r.stdout)[-600:]}. Kaggle's own Python is not used silently; "
+                           "see kaggle/README.md.")
     actual = _run([py, "-c", "import sys;print(sys.version.split()[0])"]).stdout.strip()
     warn = check_python(actual, expected_python, allow_python_mismatch)
     if warn:

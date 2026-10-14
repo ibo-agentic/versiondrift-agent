@@ -110,11 +110,53 @@ What the laptop actually runs (read from its `.venv`, not from `requirements.txt
 * If Python is not 3.12.12 the notebook stops with a message (`ALLOW_PYTHON_MISMATCH=True` in cell 1 overrides it,
   and the mismatch is then recorded and flagged by the import script).
 
-**Kaggle environment settings.** Notebook Settings has an *Environment* choice ("Pin to original environment" /
-"Always use latest environment"; I could not verify what Python each one carries for your notebook). Kaggle
-notebooks offer no choice of Python 3.11 or of a custom Docker image, so this notebook does not depend on that
-setting: it builds its own interpreter with `uv`. Needs: Internet On (uv downloads CPython from GitHub; the wheel
-comes from GitHub releases; pip packages from PyPI).
+**Python on Kaggle: what can and cannot be chosen (checked 2026-10-14).**
+
+* *Pin Kaggle to an older Docker image?* Not by Python version. Notebook **Session options -> Environment** offers
+  "Pin to original environment" (the image the notebook was created with) or "Always use latest environment".
+  There is no Python 3.11/3.12 choice and no custom Docker image for Kaggle notebooks; the pinned images are
+  identified by date, not by Python version, and the option is sometimes greyed out. The only reported way to get an
+  older image is to **Copy & Edit** an old public notebook that was created while Kaggle's image still had an older
+  Python and keep it on "Pin to original environment". I could not verify which Python any such image carries, so
+  this notebook does not depend on it.
+* *Install Python 3.12 inside the session and run everything in it?* Yes, that is what cell 4 does:
+  1. `pip install uv` into the notebook kernel (adds one package; nothing else in the kernel is touched);
+  2. `uv venv --python 3.12.12 /kaggle/temp/venv` (uv downloads CPython 3.12.12 from GitHub; the same
+     python-build-standalone family as the laptop's uv-managed interpreter). If uv cannot, it tries
+     `conda create -p /kaggle/temp/venv python=3.12.12`;
+  3. installs the laptop's package pins and the CUDA wheel into **that** venv with `uv pip install --python ...`;
+  4. launches the two GPU workers with that venv's `python`, so `kaggle_run_one.py` and `upgradecanary` run on 3.12.12.
+  The GPU does not depend on the Python version: the wheel's `libggml-cuda.so` is loaded with `dlopen` and talks
+  to Kaggle's NVIDIA driver directly, and the CUDA runtime libs come from pip packages placed on
+  `LD_LIBRARY_PATH` (or Kaggle's system CUDA). Cell 4 verifies in that interpreter: Python 3.12.12,
+  llama-cpp-python 0.3.35, `llama_backend_init()` and `llama_supports_gpu_offload() == True`. A missing CUDA
+  library fails at that import, so a pass there means the CUDA libs resolved. What it cannot show is device
+  initialisation under real load; the first hardware-check run is that test (not yet done on Kaggle).
+* *Prebuilt wheel for Python 3.12?* Yes, no build needed. URL (the laptop's build, `v0.3.35-cu125`):
+  `https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35-cu125/llama_cpp_python-0.3.35-py3-none-manylinux_2_35_x86_64.whl`
+  (1,676,663,334 bytes, SHA-256 `3b12c0188e1d90880d59645fd026e262f0f828ae5078df2a4a44a4801ea059d2`).
+  Same-release Linux wheels also exist for `cu121` and `cu124` (`.../v0.3.35-cu121/...`, `.../v0.3.35-cu124/...`)
+  but they are not the laptop's build. Note on the cause: this wheel is tagged `py3-none` and its metadata says
+  `Requires-Python: >=3.8` with classifiers for 3.8 through 3.14, so it is not restricted to 3.9-3.12. If a 3.13
+  failure came from a source build or another package, the venv above avoids it either way.
+* *Order inside cell 4:* check Python (the run interpreter must be 3.12.12; anything above 3.12 stops with a
+  message) -> attached wheel dataset -> the release wheel URL above (size + SHA-256 verified) -> build 0.3.35 from
+  source (last resort). A different llama-cpp-python version is never installed.
+
+**Exact clicks, first session**
+1. kaggle.com -> *Datasets* -> *New dataset* -> upload `kaggle_repo.zip` (from `python kaggle/make_repo_archive.py`),
+   visibility **Private** -> *Create*.
+2. *Code* -> *New Notebook* -> *File* -> *Import Notebook* -> choose `kaggle/f5_runner.ipynb`.
+3. Right sidebar *Session options*: **Accelerator** = *GPU T4 x2*; **Internet** = *On*; leave **Environment** as it is
+   (not needed). *Persistence* = *No persistence* is fine; you download zips yourself.
+4. *Add Input* (right sidebar) -> *Your datasets* -> pick the code dataset.
+5. Cell 1: leave `RUN_GROUP = "hwcheck"`, `ALLOW_PYTHON_MISMATCH = False`.
+6. *Run All*. Cell 4 prints `release wheel v0.3.35-cu125 | python 3.12.12, llama-cpp-python 0.3.35 with GPU offload ...`
+   and `CUDA runtime: pip nvidia-*-cu12 (laptop pins)` (or `system CUDA ...`). If it stops, copy the message to me.
+7. When it finishes, open the *Output* tab (or the file panel) and download everything under
+   `/kaggle/working/export/` (`kaggle__KAGGLE_HWCHECK__*.zip`).
+8. On the laptop: `python scripts/import_kaggle_results.py <folder with the zips>`, then run the analysis; only if
+   `hwcheck_runs.csv` shows all 6 runs within 0.03, start the next session with `RUN_GROUP = "f5"`.
 
 **Optional wheel dataset.** If you attach a dataset containing `llama_cpp_python-0.3.35-*.whl`, it is installed
 instead of downloading (version in the file name must be exactly `0.3.35`). Only useful if GitHub is unreachable

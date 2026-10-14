@@ -30,8 +30,10 @@ def test_check_python():
     import pytest
 
     assert ki.check_python("3.12.12", "3.12.12") is None
-    with pytest.raises(RuntimeError, match="laptop runs 3.12.12"):
+    with pytest.raises(RuntimeError, match="above 3.12"):
         ki.check_python("3.13.15", "3.12.12")
+    with pytest.raises(RuntimeError, match="laptop runs 3.12.12"):
+        ki.check_python("3.11.9", "3.12.12")        # below: also not the laptop's interpreter
     warn = ki.check_python("3.13.15", "3.12.12", allow_mismatch=True)
     assert "ALLOW_PYTHON_MISMATCH" in warn
 
@@ -51,13 +53,21 @@ def test_find_wheels_exact_version_only(tmp_path):
 class FakeToolchain:
     """Stands in for uv/pip/the venv interpreter; records every command."""
 
-    def __init__(self, tmp_path, python_version="3.12.12", pip_wheel_works=True, venv_works=True):
+    def __init__(self, tmp_path, python_version="3.12.12", pip_wheel_works=True, venv_works=True, conda_works=False):
         self.cmds, self.tmp = [], tmp_path
         self.python_version, self.pip_wheel_works, self.venv_works = python_version, pip_wheel_works, venv_works
+        self.conda_works = conda_works
 
     def run(self, cmd, env=None, timeout=None):
         self.cmds.append((list(cmd), env))
         ok = types.SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[:2] == ["conda", "create"]:
+            if not self.conda_works:
+                return types.SimpleNamespace(returncode=1, stdout="", stderr="conda failed")
+            py = Path(cmd[cmd.index("-p") + 1]) / "bin" / "python"
+            py.parent.mkdir(parents=True, exist_ok=True)
+            py.write_bytes(b"")
+            return ok
         if cmd[:2] == ["uv", "venv"]:
             if not self.venv_works:
                 return types.SimpleNamespace(returncode=1, stdout="", stderr="no python")
@@ -161,6 +171,14 @@ def test_venv_creation_failure_does_not_fall_back_to_kaggle_python(tmp_path, mon
     _patch_env(monkeypatch, tc)
     with pytest.raises(RuntimeError, match="not used silently"):
         _build(tmp_path)
+
+
+def test_conda_is_the_second_route_for_python_312(tmp_path, monkeypatch):
+    tc = FakeToolchain(tmp_path, venv_works=False, conda_works=True)
+    _patch_env(monkeypatch, tc)
+    env = _build(tmp_path)
+    assert any(c[:2] == ["conda", "create"] and "python=3.12.12" in c for c, _ in tc.cmds)
+    assert any("trying conda" in n for n in env.info["notes"])
 
 
 def test_unreachable_release_wheel_builds_same_version_with_workflow_flags(tmp_path, monkeypatch):
