@@ -4,6 +4,19 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-14 — F5/R_F5 small models complete: manifest diffs clean
+
+All 30 laptop F5/R_F5 runs completed (5 small models x 3 suites x 2
+protocols). **Manifest diff, confirmed directly for every model**:
+`F5` vs `D` and `R_F5` vs `R` each differ in exactly the same two
+fields -- `run_factors.F5_quant_level` (`unspecified` -> `Q8_0`) and
+`model_backend.model_path` (the Q4_K_M file -> the Q8_0 file) -- both
+labeling the one intended change (quant level, necessarily carrying a
+different file path). No other field differs for any model, any
+suite, any protocol. Unlike F11's manifest diff, there is no second
+real difference hiding here: Q8_0/Q4_K_M swaps the weights file only,
+nothing about sampling, stop tokens, or wrapping changes.
+
 ## 2026-10-13 — F11 vs D: the differing manifest fields, one by one (and one real second difference)
 
 Checked directly on all 18 completed F11 runs against the matching D runs (6 models x 3 suites, `run_manifest.json`,
