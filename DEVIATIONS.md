@@ -4,6 +4,19 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-14 — F5/R_F5 small models complete: manifest diffs clean
+
+All 30 laptop F5/R_F5 runs completed (5 small models x 3 suites x 2
+protocols). **Manifest diff, confirmed directly for every model**:
+`F5` vs `D` and `R_F5` vs `R` each differ in exactly the same two
+fields -- `run_factors.F5_quant_level` (`unspecified` -> `Q8_0`) and
+`model_backend.model_path` (the Q4_K_M file -> the Q8_0 file) -- both
+labeling the one intended change (quant level, necessarily carrying a
+different file path). No other field differs for any model, any
+suite, any protocol. Unlike F11's manifest diff, there is no second
+real difference hiding here: Q8_0/Q4_K_M swaps the weights file only,
+nothing about sampling, stop tokens, or wrapping changes.
+
 ## 2026-10-13 — F11 vs D: the differing manifest fields, one by one (and one real second difference)
 
 Checked directly on all 18 completed F11 runs against the matching D runs (6 models x 3 suites, `run_manifest.json`,
@@ -33,8 +46,15 @@ models), so the text-level stop string is a redundant backstop (see the docstrin
 Empirical check: of the 16,200 recorded F11 outputs (6 models x 3 suites x 900), **0** contain `</s>`,
 `<|im_end|>`, `<|endoftext|>`, `[/INST]` or `<|im_start|>`. This is not a proof that no output differs, only that no
 sign of the stop strings having mattered is present. Treat F11 as "legacy wrapping, stop strings left to the EOS
-token" in any write-up, and do not describe it as a one-field change. Re-running F11 with the historical `stop`
-added would remove the question; not done.
+token" in any write-up, and do not describe it as a one-field change.
+
+**Decision: no rerun.** Re-running F11 with the historical `stop` strings added would remove the question, but
+was considered and declined: (1) cost -- F11 already took 18 runs/~6.6h, and a second pass would be a full
+second run of the same 18; (2) it would create a **third** F11 setup to keep straight (plain D wrapping,
+F11-as-run with no stop, and a hypothetical F11-with-stop), adding bookkeeping burden for a question the
+zero-leak evidence above already answers in practice. The decision rests on that evidence (0/16,200 outputs
+contain any stop string) plus the fact that llama.cpp halts on EOS tokens regardless of the text-level `stop`
+list -- not on the cost/setup reasons alone.
 
 Config-level differences that are not manifest fields (checked in the generated configs): `model.prompt_template`
 (the legacy wrapper itself, i.e. the change), and `model.thinking: default` written explicitly (identical to

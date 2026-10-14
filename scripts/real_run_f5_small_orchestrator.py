@@ -166,6 +166,8 @@ def write_final_report(runs: list[tuple[str, str, str]]) -> None:
             tc = [p for p in parsed if p["condition"] in ("baseline", "schema_drift")]
             row["parse_rate"] = sum(1 for p in tc if p["metrics"]["parse_ok"]) / len(tc) if tc else None
             row["truncation_rate"] = sum(1 for r in raw if r.get("truncated")) / len(raw) if raw else None
+            greedy_base = [p for p in parsed if p["condition"] == "baseline" and p["trial_index"] == 0]
+            row["greedy_baseline_acc"] = sum(p["metrics"]["score"] for p in greedy_base) / len(greedy_base) if greedy_base else None
         rows.append(row)
 
     def fmt(x):
@@ -181,13 +183,14 @@ def write_final_report(runs: list[tuple[str, str, str]]) -> None:
         f"**Total elapsed time: {total_s / 3600:.1f} hours**",
         f"**Errors: {len(errors)}**",
         "",
-        "| Protocol | Model | Suite | Records | Parse rate | Truncation rate | Seconds |",
-        "|---|---|---|---|---|---|---|",
+        "| Protocol | Model | Suite | Records | Parse rate | Truncation rate | Greedy baseline acc | Seconds |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         s = r["status"]
         lines.append(f"| {r['protocol']} | {r['model']} | {r['suite']} | {s.get('num_records', '?')} | "
-                     f"{fmt(r.get('parse_rate'))} | {fmt(r.get('truncation_rate'))} | {s.get('elapsed_seconds', 0):.0f} |")
+                     f"{fmt(r.get('parse_rate'))} | {fmt(r.get('truncation_rate'))} | "
+                     f"{fmt(r.get('greedy_baseline_acc'))} | {s.get('elapsed_seconds', 0):.0f} |")
     if errors:
         lines += ["", "## Errors", ""] + [f"- {e}" for e in errors]
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
