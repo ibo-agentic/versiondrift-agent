@@ -85,9 +85,29 @@ protocols:
   F10: {folder: F10, root: rescored, expected_records: 300}
   # robust protocol R and its nuisance variants (folder names assumed; edit)
   R:       {folder: R,       confounded_models: {qwen3: grammar+thinking_blocked}}
-  R_F3:    {folder: R_F3,    confounded_models: {qwen3: grammar+thinking_blocked}}
-  R_F5:    {folder: R_F5,    confounded_models: {qwen3: grammar+thinking_blocked}}
-  R_F6:    {folder: R_F6,    confounded_models: {qwen3: grammar+thinking_blocked}}
+  # 2026-10-15: R_F3/R_F6 are held-out-only (DEVIATIONS.md, 2026-10-12) --
+  # every held-out model resolves to something (a real run or an override
+  # to R), but no design model (mistral_v*/qwen*) was ever run or mapped
+  # under either factor. Without this models: list, Store.applies() reads
+  # the absent key as "applies to everyone" and tries to read design
+  # models' data directly from a folder that was never populated for
+  # them, instead of falling back to D (engine.py's documented, already-
+  # working mechanism for a protocol that doesn't cover every model, e.g.
+  # F2's Qwen3-only scope). This list is config only; no scoring/gate code
+  # changed.
+  R_F3:    {folder: R_F3,    confounded_models: {qwen3: grammar+thinking_blocked},
+            models: [llama3, llama31, phi3_mini, phi35_mini, phi4_mini,
+                     granite30, granite31, granite32, gemma2_2b, gemma3_4b]}
+  # 2026-10-15: R_F5 is ALSO held-out-only (5 small models locally +
+  # 5 held-out 8B models on Kaggle = these same 10 held-out models; F5
+  # itself, unlike its R_ variant, genuinely runs on all 16 and keeps no
+  # models: restriction). Same fix/reasoning as R_F3/R_F6 above.
+  R_F5:    {folder: R_F5,    confounded_models: {qwen3: grammar+thinking_blocked},
+            models: [llama3, llama31, phi3_mini, phi35_mini, phi4_mini,
+                     granite30, granite31, granite32, gemma2_2b, gemma3_4b]}
+  R_F6:    {folder: R_F6,    confounded_models: {qwen3: grammar+thinking_blocked},
+            models: [llama3, llama31, phi3_mini, phi35_mini, phi4_mini,
+                     granite30, granite31, granite32, gemma2_2b, gemma3_4b]}
   # 2026-10-09: R_unconstrained == F1 exactly (D + max_tokens=1024, no
   # constrained decoding, nothing else differs -- confirmed field-by-field
   # against the real F1 config, not assumed). Reuses F1's folder instead of

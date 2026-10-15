@@ -4,6 +4,49 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+## 2026-10-15 — Full analysis run: two pre-run fixes, one unfixed diagnostic quirk flagged
+
+Running `python -m vdanalysis.run_analysis` for the first full, one-pass
+analysis (PLAN.md sections 8-9) required two fixes first, both config/
+file-organization, neither touching `engine.py`/`loader.py`/scoring:
+
+1. `rescored/F7|F8|F10/` held only the Kaggle F5/R_F5 exploratory
+   rescores from an earlier, separate task -- never a D-sourced
+   rescore, which is what PLAN.md's F7/F8/F10 factors and the
+   pipeline's protocol entries actually require. Caused a hard crash
+   for 10/16 models (2 run-dirs where 1 was expected). Fixed: moved
+   the exploratory rescores to `rescored/F7_kaggle_check/` etc.
+   (preserved), ran the canonical D-sourced rescore fresh for all 16
+   models.
+2. `R_F3`, `R_F6`, `R_F5` had no `models:` key in `configs/
+   analysis_official_folders.yaml`, even though all three are
+   held-out-only factors. `Store.applies()` reads a missing `models:`
+   as "applies to everyone," so the engine's own documented
+   fallback-to-D path (already correct for F2's Qwen3-only scope)
+   never triggered for the 6 design models under these factors, and
+   it tried to read data that was never produced for them. Fixed by
+   adding `models: [the 10 held-out models]` to all three entries.
+
+Both confirmed with the user before touching shared files. Full
+analysis then ran in one pass: 17 tables, 0 warnings, 0 missing.
+
+**Found, not fixed** (reported per instruction, not a scoring bug):
+the `n_unmatched` column in `decisions_D.csv`/`decisions_all_
+protocols.csv`/`controls.csv`/`size_changing_decisions.csv` is
+`max(n_old, n_new) - n_records`, where `n_old`/`n_new` count a run's
+full 900 records but `n_records` only counts matched stress-condition
+records (<=600) -- inflating the column by >=300 (baseline's count,
+excluded by design, not "unmatched") for every single row. Confirmed
+directly: all 30 D rows show exactly `600/300`. For the A/A control
+there's a real *additional* mismatch on top of that 300 (the seed
+change also reseeds which fault_reporting fault gets chosen per task
+-- confirmed directly, 66/300 matching fault types vs 300/300 for
+schema_drift's drift type on the same suite), making the displayed
+number look worse than the genuine data loss. The stress_diff/label
+values themselves are unaffected (already computed from only the true
+matched keys) -- this is a diagnostic-column definition issue, not a
+verdict-correctness bug. Full writeup: `analysis/plan/analysis_report.md`.
+
 ## 2026-10-14 — F5/R_F5 small models complete: manifest diffs clean
 
 All 30 laptop F5/R_F5 runs completed (5 small models x 3 suites x 2
