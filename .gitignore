@@ -24,3 +24,4 @@ results_v3/W0_determinism/*
 !results_v3/W0_determinism/*.md
 !results_v3/W0_determinism/*.sh
 osf_deposit/
+kaggle_upload/
