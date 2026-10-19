@@ -21,7 +21,8 @@ Every cell of each table was compared as text with the table written by the orig
 | controls_summary | 3 / 3 | 0 |
 | hypotheses (H1-H5, all variants) | 19 / 19 | 0 |
 
-**Total differences: 0.** Run time 2 min 25 s (first run), 2 min 01 s (re-run after the v4 update). No loader warnings, no missing runs.
+**Total differences: 0.** Run time 2 min 25 s (first run), 2 min 01 s (re-run after the v4 update), 2 min 01 s (re-run after the cluster-bootstrap
+and W3-suites changes; again 0 differences). No loader warnings, no missing runs.
 
 Side result: the merge checks (prompts byte-identical across the trials of every (task, condition),
 no duplicate (task, condition, trial), seeds equal to 1234 + trial index, one temperature per trial)
