@@ -131,10 +131,15 @@ phase2:
     protocols:
       D: {protocol: D_W3, gate: point}
       R: {protocol: R_W3, gate: ci}
+    suites: [bfcl_simple, bfcl_multiple]      # synthetic is not extended in W3
     original_tasks:
-      synthetic: ../data/base_tasks.jsonl
       bfcl_simple: ../data/bfcl_tasks.jsonl
       bfcl_multiple: ../data/bfcl_multiple_tasks.jsonl
+
+  # Descriptive: for these suites every decision is also reported with a cluster bootstrap in which tasks that share
+  # the same baseline prompt form one cluster (the synthetic generator repeats prompts: 54 distinct in 100 tasks).
+  cluster_bootstrap:
+    suites: [synthetic]
 
 controls:
   - {name: AA2_R, kind: aa2, protocol_a: R, protocol_b: R_AA2, gate: ci,

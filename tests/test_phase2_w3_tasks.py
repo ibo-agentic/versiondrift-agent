@@ -140,16 +140,15 @@ def test_w3_manifest_points_at_the_new_files():
         by_suite.setdefault(e["suite"], set()).add((e["data"], e["data_status"], e["n_tasks"]))
     assert by_suite["bfcl_simple"] == {("data/phase2/w3_added_bfcl_simple.jsonl", "ok", 91)}
     assert by_suite["bfcl_multiple"] == {("data/phase2/w3_added_bfcl_multiple.jsonl", "ok", 9)}
-    assert by_suite["synthetic"] == {("data/phase2/w3_added_synthetic.jsonl", "pending", 200)}      # not generated yet
-    assert m["estimated_hours"] == pytest.approx(108.40, abs=0.05)
+    assert set(by_suite) == {"bfcl_simple", "bfcl_multiple"}                                  # synthetic is not extended
+    assert m["n_runs"] == 64 and m["estimated_hours"] == pytest.approx(34.53, abs=0.05)
     for e in m["runs"]:
-        if e["suite"] != "synthetic":
-            assert e["expected_records"] == e["n_tasks"] * 3 * 10 and (ROOT / e["data"]).exists()
+        assert e["expected_records"] == e["n_tasks"] * 3 * 10 and (ROOT / e["data"]).exists()
 
 
 def test_check_configs_is_clean_with_the_new_files():
     r = check_all()
-    assert r["problems"] == [] and r["pending_task_files"] == ["data/phase2/w3_added_synthetic.jsonl"]
+    assert r["problems"] == [] and r["pending_task_files"] == [] and r["n_runs"] == 517
 
 
 def test_task_file_check_catches_wrong_counts_missing_files_and_stale_pending(tmp_path):

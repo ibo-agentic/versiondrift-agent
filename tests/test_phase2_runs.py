@@ -42,12 +42,12 @@ def entry(manifests, id_):
 # =============================================================================== manifests (committed)
 def test_run_counts_and_hours_match_the_plan(manifests):
     n = {k: m["n_runs"] for k, m in manifests.items()}
-    assert n == {"W1_laptop": 252, "W1_kaggle": 81, "W2_R": 48, "W2_D": 48, "W2b": 24, "W3": 96}
+    assert n == {"W1_laptop": 252, "W1_kaggle": 81, "W2_R": 48, "W2_D": 48, "W2b": 24, "W3": 64}
     h = {k: m["estimated_hours"] for k, m in manifests.items()}
     assert h["W1_laptop"] == pytest.approx(195.64, abs=0.05)       # PLAN_PHASE2.md section 6 (322.4 total with W2b)
     assert h["W1_kaggle"] == pytest.approx(136.77, abs=0.05)
     assert h["W2_R"] == pytest.approx(70.18, abs=0.05) and h["W2_D"] == pytest.approx(38.37, abs=0.05)
-    assert h["W2b"] == pytest.approx(18.16, abs=0.05) and h["W3"] == pytest.approx(108.40, abs=0.05)
+    assert h["W2b"] == pytest.approx(18.16, abs=0.05) and h["W3"] == pytest.approx(34.53, abs=0.05)   # bfcl only
     assert sum(h[k] for k in ("W1_laptop", "W2_R", "W2_D", "W2b")) == pytest.approx(322.4, abs=0.1)
     assert manifests["W1_laptop"]["runs_by_folder"] == {"D": 48, "R": 48, "F1": 48, "F2": 3, "F3": 24, "F4_json": 48,
                                                           "F5": 15, "F6": 18}
@@ -104,8 +104,8 @@ def test_w3_runs_the_added_tasks_only_and_is_conditional(manifests):
     m = manifests["W3"]
     assert "20 Nov" in m["conditional"] or "2026-11-20" in m["conditional"]
     for e in m["runs"]:
-        assert e["n_tasks"] == plan.ADDED_TASKS[e["suite"]]
-        assert e["data_status"] == ("pending" if e["suite"] == "synthetic" else "ok")     # synthetic generator: open question
+        assert e["suite"] in ("bfcl_simple", "bfcl_multiple")           # synthetic is not extended
+        assert e["n_tasks"] == plan.ADDED_TASKS[e["suite"]] and e["data_status"] == "ok"
         assert e["expected_records"] == e["n_tasks"] * 3 * 10 and e["folder"] in ("W3_D", "W3_R")
 
 
@@ -267,8 +267,9 @@ def test_builder_scales_phase1_times(fake_phase1):
     assert ms["W2_R"]["estimated_hours"] == pytest.approx(48 * 10 / 3)
     assert ms["W2b"]["estimated_hours"] == pytest.approx(24 * 7 / 3)
     assert ms["W1_kaggle"]["estimated_hours"] == pytest.approx((33 + 33 + 15) * 10 / 3)
-    e = next(e for e in ms["W3"]["runs"] if e["suite"] == "synthetic")
-    assert e["estimated_hours"] == pytest.approx(2.0 * 10 / 3, abs=1e-3)                        # 200 added tasks
+    e = next(e for e in ms["W3"]["runs"] if e["suite"] == "bfcl_simple")
+    assert e["estimated_hours"] == pytest.approx(0.91 * 10 / 3, abs=1e-3)                       # 91 added tasks
+    assert {e["suite"] for e in ms["W3"]["runs"]} == {"bfcl_simple", "bfcl_multiple"}
     assert [e["order"] for e in ms["W1_laptop"]["runs"]] == list(range(ms["W1_laptop"]["n_runs"]))
     folders = [e["folder"] for e in ms["W1_laptop"]["runs"]]
     assert folders.index("D") < folders.index("R") < folders.index("F1") and folders[0] == "D"

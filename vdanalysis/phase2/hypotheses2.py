@@ -207,7 +207,7 @@ def p7_rows(an: Phase2Analysis, task_ids_by_suite: dict[str, set[str]]) -> list[
             sub = Phase2Analysis(an.cfg, an.store, an.with_ci, an.allow_missing, ViewSpec(tasks=frozenset(ids)))
             orig_view[suite] = {k: r for k, r in sub.rows(proto).items() if k[1] == suite}
         tot_n = tot_d = 0
-        for suite in an.cfg.suites:
+        for suite in (w3.get("suites") or an.cfg.suites):
             f_rows = {k: r for k, r in full.items() if k[1] == suite}
             o_rows = orig_view.get(suite, {})
             keys = sorted(set(f_rows) & set(o_rows))

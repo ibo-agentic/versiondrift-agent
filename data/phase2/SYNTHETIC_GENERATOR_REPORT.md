@@ -1,4 +1,7 @@
-# W3 synthetic added tasks: blocked, decision needed (report, 2026-10-19)
+# W3 synthetic added tasks: why synthetic is not extended (report, 2026-10-19)
+
+**Resolved (PLAN_PHASE2.md v4, edited 2026-10-19): option C. Synthetic is not extended in W3; the synthetic decisions
+are additionally reported with a cluster bootstrap over tasks that share a baseline prompt (descriptive only).**
 
 PLAN_PHASE2.md W3 asks for "synthetic: 300 tasks (original 100 + 200 from the generator, seed 20261019)", and the
 task asked for "no duplicate prompts" and "no overlap with the original 100". The existing generator

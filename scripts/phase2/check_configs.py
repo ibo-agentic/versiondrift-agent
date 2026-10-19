@@ -75,8 +75,9 @@ def check_against_analysis(manifests: dict[str, dict], cfg: Phase2Config) -> lis
     for key in sorted(set(need) & set(have)):
         want = need[key]
         suites = sorted(e["suite"] for e in have[key])
-        if suites != sorted(SUITE_ORDER):
-            problems.append(f"{key}: suites {suites}, expected all of {SUITE_ORDER}")
+        want_suites = sorted((cfg.p2.get("w3") or {}).get("suites") or SUITE_ORDER) if key[0].startswith("W3_")             else sorted(SUITE_ORDER)
+        if suites != want_suites:
+            problems.append(f"{key}: suites {suites}, expected all of {want_suites}")
         for e in have[key]:
             if e["output_dir"] != f"results_v3/{e['folder']}/{e['model']}/{e['suite']}":
                 problems.append(f"{e['id']}: output_dir {e['output_dir']}")

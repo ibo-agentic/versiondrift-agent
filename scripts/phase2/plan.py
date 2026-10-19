@@ -50,8 +50,11 @@ KAGGLE_D_MODELS = ["granite30", "granite31", "granite32", "llama3", "llama31", "
                    "mistral_v03", "qwen2", "qwen25", "qwen3"]
 KAGGLE_R_MODELS = ["granite30", "granite31", "granite32", "llama3", "llama31"]
 CONTROL_MODELS = ["mistral_v03", "qwen25", "llama31", "granite32"]
-ADDED_TASKS = {"synthetic": 200, "bfcl_simple": 91, "bfcl_multiple": 9}
-W3_SUITE_DATA = {s: f"data/phase2/w3_added_{s}.jsonl" for s in SUITES}     # produced by the W3 task generator
+# W3 extends the BFCL suites only; the synthetic suite is not extended (its generator is deterministic with small value
+# pools: the original 100 tasks hold 54 distinct baseline prompts, and it cannot make new distinct prompts for 5 of 6 tools).
+ADDED_TASKS = {"bfcl_simple": 91, "bfcl_multiple": 9}
+W3_SUITES = list(ADDED_TASKS)
+W3_SUITE_DATA = {s: f"data/phase2/w3_added_{s}.jsonl" for s in W3_SUITES}      # scripts/phase2/w3_tasks.py
 W3_DEADLINE = "2026-11-20"
 GPU_DEADLINE = "2026-12-10"
 
@@ -228,11 +231,13 @@ def w2b(t: Phase1Timing) -> list[dict]:
 
 
 def w3(t: Phase1Timing, root: Path = REPO_ROOT) -> list[dict]:
-    """Added tasks only. A suite's entries are 'ok' once its added-task file exists in the repo (the task count is then
-    read from the file), else 'pending'."""
+    """Added BFCL tasks only (synthetic is not extended). A suite's entries are 'ok' once its added-task file exists in
+    the repo (the task count is then read from the file), else 'pending'."""
     out = []
     for folder, base in (("W3_D", "D"), ("W3_R", "R")):
         for model, suite in _runs(t.models(base)):
+            if suite not in W3_SUITES:
+                continue
             p1 = t.seconds(base, model, suite) / 3600
             data = W3_SUITE_DATA[suite]
             have = (root / data).exists()
