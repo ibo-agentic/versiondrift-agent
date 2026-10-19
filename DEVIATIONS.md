@@ -4,6 +4,8 @@ Every change to the plan after PLAN.md was committed as v1 (git tag
 `plan-v1`) is logged here with the date and reason, instead of editing
 PLAN.md itself. Newest first.
 
+Phase 2 strengthening runs pre-registered in PLAN_PHASE2.md (tag plan-v2). Phase 1 results unchanged.
+
 ## 2026-10-15 — Full analysis run: two pre-run fixes, one unfixed diagnostic quirk flagged
 
 Running `python -m vdanalysis.run_analysis` for the first full, one-pass
