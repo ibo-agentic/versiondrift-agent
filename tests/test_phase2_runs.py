@@ -104,7 +104,8 @@ def test_w3_runs_the_added_tasks_only_and_is_conditional(manifests):
     m = manifests["W3"]
     assert "20 Nov" in m["conditional"] or "2026-11-20" in m["conditional"]
     for e in m["runs"]:
-        assert e["n_tasks"] == plan.ADDED_TASKS[e["suite"]] and e["data_status"] == "pending"
+        assert e["n_tasks"] == plan.ADDED_TASKS[e["suite"]]
+        assert e["data_status"] == ("pending" if e["suite"] == "synthetic" else "ok")     # synthetic generator: open question
         assert e["expected_records"] == e["n_tasks"] * 3 * 10 and e["folder"] in ("W3_D", "W3_R")
 
 
