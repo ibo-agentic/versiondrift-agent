@@ -1,7 +1,5 @@
 """Clopper-Pearson, kappa, and the Phase 2 config layer."""
 
-import math
-
 import pytest
 import yaml
 
@@ -47,9 +45,7 @@ def test_clopper_pearson_rejects_bad_input():
 def test_kappa():
     assert cohen_kappa(list("aabb"), list("aabb")) == pytest.approx(1.0)
     assert cohen_kappa(list("aabb"), list("bbaa")) == pytest.approx(-1.0)
-    # 10 items, 7 agree, marginals 50/50 -> po 0.7, pe 0.5 -> kappa 0.4
-    a = list("aaaaabbbbb")
-    b = list("aaabbbbbba")[:5] + list("bbbbb")
+    # 10 items, 6 agree, marginals 50/50 -> po 0.6, pe 0.5 -> kappa 0.2
     assert cohen_kappa(["a"] * 5 + ["b"] * 5, ["a", "a", "a", "b", "b", "b", "b", "b", "a", "a"]) == pytest.approx(0.2)
     assert cohen_kappa(["a", "a"], ["a", "a"]) is None          # chance agreement 1: undefined
     assert cohen_kappa([], []) is None
