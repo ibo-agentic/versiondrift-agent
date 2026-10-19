@@ -227,17 +227,21 @@ def w2b(t: Phase1Timing) -> list[dict]:
     return out
 
 
-def w3(t: Phase1Timing) -> list[dict]:
+def w3(t: Phase1Timing, root: Path = REPO_ROOT) -> list[dict]:
+    """Added tasks only. A suite's entries are 'ok' once its added-task file exists in the repo (the task count is then
+    read from the file), else 'pending'."""
     out = []
     for folder, base in (("W3_D", "D"), ("W3_R", "R")):
         for model, suite in _runs(t.models(base)):
             p1 = t.seconds(base, model, suite) / 3600
-            n_added = ADDED_TASKS[suite]
+            data = W3_SUITE_DATA[suite]
+            have = (root / data).exists()
+            n_added = task_count(suite, data) if have else ADDED_TASKS[suite]
             out.append(make_entry("W3", folder, model, suite, "laptop", "fresh", p1 * n_added / 100 * 10 / 3, p1,
-                                  "Q4_K_M", LAPTOP_GGUF[model], data=W3_SUITE_DATA[suite], data_status="pending",
+                                  "Q4_K_M", LAPTOP_GGUF[model], data=data, data_status="ok" if have else "pending",
                                   n_tasks=n_added,
                                   note=f"added tasks only ({n_added}); merged with the W1 D/R records for the "
-                                       "original 100. Task file is produced by the W3 generator (pending)."))
+                                       "original 100." + ("" if have else " Task file not generated yet (pending).")))
     return out
 
 

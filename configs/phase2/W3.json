@@ -59,7 +59,7 @@
    "output_dir": "results_v3/W3_D/gemma2_2b/synthetic",
    "phase1_hours": 0.0617,
    "estimated_hours": 0.4115,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 0
   },
   {
@@ -101,13 +101,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/gemma2_2b/bfcl_simple",
    "phase1_hours": 0.0843,
    "estimated_hours": 0.2558,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 1
   },
   {
@@ -149,13 +149,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/gemma2_2b/bfcl_multiple",
    "phase1_hours": 0.0912,
    "estimated_hours": 0.0274,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 2
   },
   {
@@ -203,7 +203,7 @@
    "output_dir": "results_v3/W3_D/gemma3_4b/synthetic",
    "phase1_hours": 0.1028,
    "estimated_hours": 0.6856,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 3
   },
   {
@@ -245,13 +245,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/gemma3_4b/bfcl_simple",
    "phase1_hours": 0.1337,
    "estimated_hours": 0.4055,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 4
   },
   {
@@ -293,13 +293,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/gemma3_4b/bfcl_multiple",
    "phase1_hours": 0.1405,
    "estimated_hours": 0.0422,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 5
   },
   {
@@ -347,7 +347,7 @@
    "output_dir": "results_v3/W3_D/phi3_mini/synthetic",
    "phase1_hours": 0.0916,
    "estimated_hours": 0.6104,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 6
   },
   {
@@ -389,13 +389,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/phi3_mini/bfcl_simple",
    "phase1_hours": 0.1197,
    "estimated_hours": 0.3631,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 7
   },
   {
@@ -437,13 +437,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/phi3_mini/bfcl_multiple",
    "phase1_hours": 0.1474,
    "estimated_hours": 0.0442,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 8
   },
   {
@@ -491,7 +491,7 @@
    "output_dir": "results_v3/W3_D/qwen2/synthetic",
    "phase1_hours": 0.1316,
    "estimated_hours": 0.8771,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 9
   },
   {
@@ -533,13 +533,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/qwen2/bfcl_simple",
    "phase1_hours": 0.1824,
    "estimated_hours": 0.5532,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 10
   },
   {
@@ -581,13 +581,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/qwen2/bfcl_multiple",
    "phase1_hours": 0.1867,
    "estimated_hours": 0.056,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 11
   },
   {
@@ -635,7 +635,7 @@
    "output_dir": "results_v3/W3_D/llama31/synthetic",
    "phase1_hours": 0.1414,
    "estimated_hours": 0.9424,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 12
   },
   {
@@ -677,13 +677,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/llama31/bfcl_simple",
    "phase1_hours": 0.1808,
    "estimated_hours": 0.5483,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 13
   },
   {
@@ -725,13 +725,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/llama31/bfcl_multiple",
    "phase1_hours": 0.1859,
    "estimated_hours": 0.0558,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 14
   },
   {
@@ -779,7 +779,7 @@
    "output_dir": "results_v3/W3_D/mistral_v01/synthetic",
    "phase1_hours": 0.1574,
    "estimated_hours": 1.0492,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 15
   },
   {
@@ -821,13 +821,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/mistral_v01/bfcl_simple",
    "phase1_hours": 0.2079,
    "estimated_hours": 0.6306,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 16
   },
   {
@@ -869,13 +869,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/mistral_v01/bfcl_multiple",
    "phase1_hours": 0.2233,
    "estimated_hours": 0.067,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 17
   },
   {
@@ -923,7 +923,7 @@
    "output_dir": "results_v3/W3_D/qwen25/synthetic",
    "phase1_hours": 0.1329,
    "estimated_hours": 0.8861,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 18
   },
   {
@@ -965,13 +965,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/qwen25/bfcl_simple",
    "phase1_hours": 0.1665,
    "estimated_hours": 0.5049,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 19
   },
   {
@@ -1013,13 +1013,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/qwen25/bfcl_multiple",
    "phase1_hours": 0.1737,
    "estimated_hours": 0.0521,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 20
   },
   {
@@ -1067,7 +1067,7 @@
    "output_dir": "results_v3/W3_D/mistral_v03/synthetic",
    "phase1_hours": 0.1453,
    "estimated_hours": 0.9689,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 21
   },
   {
@@ -1109,13 +1109,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/mistral_v03/bfcl_simple",
    "phase1_hours": 0.1986,
    "estimated_hours": 0.6024,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 22
   },
   {
@@ -1157,13 +1157,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/mistral_v03/bfcl_multiple",
    "phase1_hours": 0.1988,
    "estimated_hours": 0.0596,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 23
   },
   {
@@ -1211,7 +1211,7 @@
    "output_dir": "results_v3/W3_D/llama3/synthetic",
    "phase1_hours": 0.1519,
    "estimated_hours": 1.0125,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 24
   },
   {
@@ -1253,13 +1253,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/llama3/bfcl_simple",
    "phase1_hours": 0.1844,
    "estimated_hours": 0.5595,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 25
   },
   {
@@ -1301,13 +1301,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/llama3/bfcl_multiple",
    "phase1_hours": 0.189,
    "estimated_hours": 0.0567,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 26
   },
   {
@@ -1355,7 +1355,7 @@
    "output_dir": "results_v3/W3_D/granite32/synthetic",
    "phase1_hours": 0.1748,
    "estimated_hours": 1.1656,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 27
   },
   {
@@ -1397,13 +1397,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/granite32/bfcl_simple",
    "phase1_hours": 0.2343,
    "estimated_hours": 0.7106,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 28
   },
   {
@@ -1445,13 +1445,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/granite32/bfcl_multiple",
    "phase1_hours": 0.2354,
    "estimated_hours": 0.0706,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 29
   },
   {
@@ -1499,7 +1499,7 @@
    "output_dir": "results_v3/W3_D/granite31/synthetic",
    "phase1_hours": 0.1717,
    "estimated_hours": 1.145,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 30
   },
   {
@@ -1541,13 +1541,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/granite31/bfcl_simple",
    "phase1_hours": 0.2375,
    "estimated_hours": 0.7205,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 31
   },
   {
@@ -1589,13 +1589,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/granite31/bfcl_multiple",
    "phase1_hours": 0.2429,
    "estimated_hours": 0.0729,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 32
   },
   {
@@ -1643,7 +1643,7 @@
    "output_dir": "results_v3/W3_D/granite30/synthetic",
    "phase1_hours": 0.1735,
    "estimated_hours": 1.1568,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 33
   },
   {
@@ -1685,13 +1685,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/granite30/bfcl_simple",
    "phase1_hours": 0.2321,
    "estimated_hours": 0.704,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 34
   },
   {
@@ -1733,13 +1733,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/granite30/bfcl_multiple",
    "phase1_hours": 0.2524,
    "estimated_hours": 0.0757,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 35
   },
   {
@@ -1787,7 +1787,7 @@
    "output_dir": "results_v3/W3_D/phi4_mini/synthetic",
    "phase1_hours": 0.1021,
    "estimated_hours": 0.6804,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 36
   },
   {
@@ -1829,13 +1829,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/phi4_mini/bfcl_simple",
    "phase1_hours": 0.1372,
    "estimated_hours": 0.4161,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 37
   },
   {
@@ -1877,13 +1877,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/phi4_mini/bfcl_multiple",
    "phase1_hours": 0.1451,
    "estimated_hours": 0.0435,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 38
   },
   {
@@ -1931,7 +1931,7 @@
    "output_dir": "results_v3/W3_D/mistral_v02/synthetic",
    "phase1_hours": 0.1782,
    "estimated_hours": 1.1881,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 39
   },
   {
@@ -1973,13 +1973,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/mistral_v02/bfcl_simple",
    "phase1_hours": 0.2223,
    "estimated_hours": 0.6742,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 40
   },
   {
@@ -2021,13 +2021,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/mistral_v02/bfcl_multiple",
    "phase1_hours": 0.2325,
    "estimated_hours": 0.0698,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 41
   },
   {
@@ -2075,7 +2075,7 @@
    "output_dir": "results_v3/W3_D/phi35_mini/synthetic",
    "phase1_hours": 0.1328,
    "estimated_hours": 0.8854,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 42
   },
   {
@@ -2117,13 +2117,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/phi35_mini/bfcl_simple",
    "phase1_hours": 0.2146,
    "estimated_hours": 0.651,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 43
   },
   {
@@ -2165,13 +2165,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/phi35_mini/bfcl_multiple",
    "phase1_hours": 0.2541,
    "estimated_hours": 0.0762,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 44
   },
   {
@@ -2219,7 +2219,7 @@
    "output_dir": "results_v3/W3_D/qwen3/synthetic",
    "phase1_hours": 1.0682,
    "estimated_hours": 7.1211,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 45
   },
   {
@@ -2261,13 +2261,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_D/qwen3/bfcl_simple",
    "phase1_hours": 1.3514,
    "estimated_hours": 4.0992,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 46
   },
   {
@@ -2309,13 +2309,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_D/qwen3/bfcl_multiple",
    "phase1_hours": 1.4051,
    "estimated_hours": 0.4215,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 47
   },
   {
@@ -2363,7 +2363,7 @@
    "output_dir": "results_v3/W3_R/gemma2_2b/synthetic",
    "phase1_hours": 0.3253,
    "estimated_hours": 2.1689,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 48
   },
   {
@@ -2405,13 +2405,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/gemma2_2b/bfcl_simple",
    "phase1_hours": 0.4592,
    "estimated_hours": 1.3929,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 49
   },
   {
@@ -2453,13 +2453,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/gemma2_2b/bfcl_multiple",
    "phase1_hours": 0.4796,
    "estimated_hours": 0.1439,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 50
   },
   {
@@ -2507,7 +2507,7 @@
    "output_dir": "results_v3/W3_R/gemma3_4b/synthetic",
    "phase1_hours": 0.3606,
    "estimated_hours": 2.4041,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 51
   },
   {
@@ -2549,13 +2549,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/gemma3_4b/bfcl_simple",
    "phase1_hours": 0.5054,
    "estimated_hours": 1.5332,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 52
   },
   {
@@ -2597,13 +2597,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/gemma3_4b/bfcl_multiple",
    "phase1_hours": 0.5392,
    "estimated_hours": 0.1617,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 53
   },
   {
@@ -2651,7 +2651,7 @@
    "output_dir": "results_v3/W3_R/phi3_mini/synthetic",
    "phase1_hours": 0.1104,
    "estimated_hours": 0.7363,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 54
   },
   {
@@ -2693,13 +2693,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/phi3_mini/bfcl_simple",
    "phase1_hours": 0.147,
    "estimated_hours": 0.446,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 55
   },
   {
@@ -2741,13 +2741,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/phi3_mini/bfcl_multiple",
    "phase1_hours": 0.1759,
    "estimated_hours": 0.0528,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 56
   },
   {
@@ -2795,7 +2795,7 @@
    "output_dir": "results_v3/W3_R/qwen2/synthetic",
    "phase1_hours": 0.2641,
    "estimated_hours": 1.761,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 57
   },
   {
@@ -2837,13 +2837,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/qwen2/bfcl_simple",
    "phase1_hours": 0.3496,
    "estimated_hours": 1.0604,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 58
   },
   {
@@ -2885,13 +2885,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/qwen2/bfcl_multiple",
    "phase1_hours": 0.3473,
    "estimated_hours": 0.1042,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 59
   },
   {
@@ -2939,7 +2939,7 @@
    "output_dir": "results_v3/W3_R/llama31/synthetic",
    "phase1_hours": 0.2485,
    "estimated_hours": 1.6567,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 60
   },
   {
@@ -2981,13 +2981,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/llama31/bfcl_simple",
    "phase1_hours": 0.3316,
    "estimated_hours": 1.0058,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 61
   },
   {
@@ -3029,13 +3029,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/llama31/bfcl_multiple",
    "phase1_hours": 0.8005,
    "estimated_hours": 0.2402,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 62
   },
   {
@@ -3083,7 +3083,7 @@
    "output_dir": "results_v3/W3_R/mistral_v01/synthetic",
    "phase1_hours": 0.226,
    "estimated_hours": 1.5066,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 63
   },
   {
@@ -3125,13 +3125,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/mistral_v01/bfcl_simple",
    "phase1_hours": 0.3004,
    "estimated_hours": 0.9112,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 64
   },
   {
@@ -3173,13 +3173,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/mistral_v01/bfcl_multiple",
    "phase1_hours": 0.3099,
    "estimated_hours": 0.093,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 65
   },
   {
@@ -3227,7 +3227,7 @@
    "output_dir": "results_v3/W3_R/qwen25/synthetic",
    "phase1_hours": 3.8411,
    "estimated_hours": 25.6071,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 66
   },
   {
@@ -3269,13 +3269,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/qwen25/bfcl_simple",
    "phase1_hours": 0.3261,
    "estimated_hours": 0.9893,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 67
   },
   {
@@ -3317,13 +3317,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/qwen25/bfcl_multiple",
    "phase1_hours": 0.3525,
    "estimated_hours": 0.1057,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 68
   },
   {
@@ -3371,7 +3371,7 @@
    "output_dir": "results_v3/W3_R/mistral_v03/synthetic",
    "phase1_hours": 0.1725,
    "estimated_hours": 1.1497,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 69
   },
   {
@@ -3413,13 +3413,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/mistral_v03/bfcl_simple",
    "phase1_hours": 0.2376,
    "estimated_hours": 0.7206,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 70
   },
   {
@@ -3461,13 +3461,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/mistral_v03/bfcl_multiple",
    "phase1_hours": 0.2381,
    "estimated_hours": 0.0714,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 71
   },
   {
@@ -3515,7 +3515,7 @@
    "output_dir": "results_v3/W3_R/llama3/synthetic",
    "phase1_hours": 0.2454,
    "estimated_hours": 1.6362,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 72
   },
   {
@@ -3557,13 +3557,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/llama3/bfcl_simple",
    "phase1_hours": 0.3351,
    "estimated_hours": 1.0166,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 73
   },
   {
@@ -3605,13 +3605,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/llama3/bfcl_multiple",
    "phase1_hours": 0.3421,
    "estimated_hours": 0.1026,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 74
   },
   {
@@ -3659,7 +3659,7 @@
    "output_dir": "results_v3/W3_R/granite32/synthetic",
    "phase1_hours": 0.2213,
    "estimated_hours": 1.475,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 75
   },
   {
@@ -3701,13 +3701,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/granite32/bfcl_simple",
    "phase1_hours": 0.2911,
    "estimated_hours": 0.883,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 76
   },
   {
@@ -3749,13 +3749,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/granite32/bfcl_multiple",
    "phase1_hours": 0.2942,
    "estimated_hours": 0.0883,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 77
   },
   {
@@ -3803,7 +3803,7 @@
    "output_dir": "results_v3/W3_R/granite31/synthetic",
    "phase1_hours": 0.2068,
    "estimated_hours": 1.3788,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 78
   },
   {
@@ -3845,13 +3845,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/granite31/bfcl_simple",
    "phase1_hours": 0.2884,
    "estimated_hours": 0.8748,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 79
   },
   {
@@ -3893,13 +3893,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/granite31/bfcl_multiple",
    "phase1_hours": 0.2976,
    "estimated_hours": 0.0893,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 80
   },
   {
@@ -3947,7 +3947,7 @@
    "output_dir": "results_v3/W3_R/granite30/synthetic",
    "phase1_hours": 0.2194,
    "estimated_hours": 1.4624,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 81
   },
   {
@@ -3989,13 +3989,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/granite30/bfcl_simple",
    "phase1_hours": 0.307,
    "estimated_hours": 0.9312,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 82
   },
   {
@@ -4037,13 +4037,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/granite30/bfcl_multiple",
    "phase1_hours": 0.2998,
    "estimated_hours": 0.0899,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 83
   },
   {
@@ -4091,7 +4091,7 @@
    "output_dir": "results_v3/W3_R/phi4_mini/synthetic",
    "phase1_hours": 0.2495,
    "estimated_hours": 1.6633,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 84
   },
   {
@@ -4133,13 +4133,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/phi4_mini/bfcl_simple",
    "phase1_hours": 0.3412,
    "estimated_hours": 1.0349,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 85
   },
   {
@@ -4181,13 +4181,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/phi4_mini/bfcl_multiple",
    "phase1_hours": 0.3648,
    "estimated_hours": 0.1094,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 86
   },
   {
@@ -4235,7 +4235,7 @@
    "output_dir": "results_v3/W3_R/mistral_v02/synthetic",
    "phase1_hours": 0.184,
    "estimated_hours": 1.2269,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 87
   },
   {
@@ -4277,13 +4277,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/mistral_v02/bfcl_simple",
    "phase1_hours": 0.2413,
    "estimated_hours": 0.732,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 88
   },
   {
@@ -4325,13 +4325,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/mistral_v02/bfcl_multiple",
    "phase1_hours": 0.2671,
    "estimated_hours": 0.0801,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 89
   },
   {
@@ -4379,7 +4379,7 @@
    "output_dir": "results_v3/W3_R/phi35_mini/synthetic",
    "phase1_hours": 0.2184,
    "estimated_hours": 1.4562,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 90
   },
   {
@@ -4421,13 +4421,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/phi35_mini/bfcl_simple",
    "phase1_hours": 0.3743,
    "estimated_hours": 1.1352,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 91
   },
   {
@@ -4469,13 +4469,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/phi35_mini/bfcl_multiple",
    "phase1_hours": 0.3863,
    "estimated_hours": 0.1159,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 92
   },
   {
@@ -4523,7 +4523,7 @@
    "output_dir": "results_v3/W3_R/qwen3/synthetic",
    "phase1_hours": 0.8687,
    "estimated_hours": 5.7913,
-   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (200); merged with the W1 D/R records for the original 100. Task file not generated yet (pending).",
    "order": 93
   },
   {
@@ -4565,13 +4565,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_simple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 91,
    "expected_records": 2730,
    "output_dir": "results_v3/W3_R/qwen3/bfcl_simple",
    "phase1_hours": 1.3528,
    "estimated_hours": 4.1036,
-   "note": "added tasks only (91); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (91); merged with the W1 D/R records for the original 100.",
    "order": 94
   },
   {
@@ -4613,13 +4613,13 @@
    ],
    "reuse": "all 10 trials run",
    "data": "data/phase2/w3_added_bfcl_multiple.jsonl",
-   "data_status": "pending",
+   "data_status": "ok",
    "n_tasks": 9,
    "expected_records": 270,
    "output_dir": "results_v3/W3_R/qwen3/bfcl_multiple",
    "phase1_hours": 1.4101,
    "estimated_hours": 0.423,
-   "note": "added tasks only (9); merged with the W1 D/R records for the original 100. Task file is produced by the W3 generator (pending).",
+   "note": "added tasks only (9); merged with the W1 D/R records for the original 100.",
    "order": 95
   }
  ]

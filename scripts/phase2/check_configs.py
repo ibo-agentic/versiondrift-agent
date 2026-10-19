@@ -126,8 +126,36 @@ def check_all(manifest_dir: Path = MANIFEST_DIR, analysis_yaml: Path | None = No
                         problems.append(f"{e['id']}: differs from Phase 1 in {d}")
                     else:
                         n_same += 1
+    pending = check_task_files(manifests, problems)
     problems += check_against_analysis(manifests, load_phase2_config(analysis_yaml))
-    return {"n_runs": n, "n_compared_with_phase1": n_cmp, "n_identical_to_phase1": n_same, "problems": problems}
+    return {"n_runs": n, "n_compared_with_phase1": n_cmp, "n_identical_to_phase1": n_same, "problems": problems,
+            "pending_task_files": pending}
+
+
+def check_task_files(manifests: dict[str, dict], problems: list[str], root: Path = REPO_ROOT) -> list[str]:
+    """Every manifest run whose task file is marked ok must point at an existing file with exactly ``n_tasks`` tasks
+    (task ids unique); returns the task files that are still pending (and checks that they are not there yet)."""
+    pending: set[str] = set()
+    checked: set[str] = set()
+    for m in manifests.values():
+        for e in m["runs"]:
+            path = root / e["data"]
+            if e["data_status"] == "pending":
+                pending.add(e["data"])
+                if path.exists():
+                    problems.append(f"{e['id']}: task file {e['data']} exists but the manifest still says pending")
+                continue
+            key = (e["data"], e["n_tasks"])
+            if key in checked:
+                continue
+            checked.add(key)
+            if not path.exists():
+                problems.append(f"{e['id']}: task file {e['data']} is missing")
+                continue
+            ids = [__import__("json").loads(l)["task_id"] for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+            if len(ids) != e["n_tasks"] or len(set(ids)) != len(ids):
+                problems.append(f"{e['id']}: {e['data']} has {len(ids)} tasks ({len(set(ids))} distinct), manifest says {e['n_tasks']}")
+    return sorted(pending)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -141,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     r = check_all(Path(args.manifests), Path(args.analysis), Path(args.phase1_root) if args.phase1_root else None)
     print(f"{r['n_runs']} runs checked; compared with Phase 1 configs: {r['n_compared_with_phase1']} "
           f"({r['n_identical_to_phase1']} identical outside the trial keys); problems: {len(r['problems'])}")
+    if r["pending_task_files"]:
+        print(f"task files still pending (not a problem): {r['pending_task_files']}")
     for p in r["problems"][:50]:
         print("  -", p)
     return 0 if not r["problems"] else 1
