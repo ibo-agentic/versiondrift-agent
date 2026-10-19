@@ -1,0 +1,15 @@
+# Regression check (PLAN_PHASE2.md / vdanalysis.phase2.regression): the Phase 2 code,
+# fed with Phase 1 data only, must reproduce the frozen Phase 1 tables exactly.
+# Phase 1 mode = 3 trials, primary gate only, no F6 trimming, no same-hardware baselines,
+# the old A/A (different run seed; records matched on drift/fault type).
+extends: analysis_official_folders.yaml
+
+phase2:
+  mode: phase1
+  n_trials: 3
+  seed_base: 1234               # trial seeds are 1234, 1235, 1236
+  default_parts:
+    - {root: auto}              # results_root, or rescored_root for F7/F8/F10 (no raw outputs there)
+  protocols:
+    F10: {n_trials: 1}
+    R_AA: {seed_base: 5678}     # Phase 1's A/A changed the run seed: trial seeds 5678-5680
