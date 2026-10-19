@@ -5,13 +5,14 @@ rows; none reads files or loads a model. Verdict columns (``supported``) use
 the thresholds of the plan; they come from ``cfg.p2['hypotheses']`` so a
 changed threshold is a config edit, not a code edit.
 
-P2 and P6 use the *replicate* notion of section 5 ("the same decision flips
-under the same factor, in the same direction, at 10 trials"). The plan does not
-say how a decision that flipped under several factors in Phase 1 is counted,
-nor whether "same direction" means the same label change or the same sign of
-the change. Rather than pick one, ``replication_variants`` computes the count
-under every reading and the P2 / P6 rows carry ``supported = None`` (pending)
-until the choice is written into the plan.
+P2 and P6 use the *replicate* notion of PLAN_PHASE2.md section 5. A Phase 1
+flipped decision replicates if, at 10 trials, it flips under at least ONE of the
+factors that flipped it in Phase 1, with the SAME LABEL CHANGE: its D label equals
+its Phase 1 D label and its label under that factor equals the Phase 1 label under
+that factor. P6 is the same rule under F5 only, starting from the same-hardware D
+label. The other three readings (every originally flipping factor must replicate;
+same sign of the change instead of the same label change; both) are computed too,
+as descriptive outputs, and are never used for a verdict.
 """
 
 from __future__ import annotations
@@ -105,37 +106,38 @@ def replication_variants(ref_index: dict[tuple, list[dict]], now_flips: list[dic
     return out
 
 
+PRIMARY_READING = "labels/any"
+
+
 def p2_p6_rows(an: Phase2Analysis, flips: list[dict], ref_rows: list[dict], view_name: str = "all"
                ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """P2 and P6 rows (primary reading: same label change, any originally flipping
+    factor) and the descriptive table with all four readings."""
     cfg = an.cfg
     h1 = cfg.groups.get("h1", [])
     f5_name = cfg.p2.get("p6_factor", "F5")
     p2_min = int(cfg.threshold_p("p2_min_replicated", 7))
     p6_min = int(cfg.threshold_p("p6_min_replicated", 4))
-    ref_all = reference_flip_index(ref_rows, cfg, h1)
-    ref_f5 = reference_flip_index(ref_rows, cfg, [f5_name])
-    v2 = replication_variants(ref_all, flips)
-    v6 = replication_variants(ref_f5, flips, factors=[f5_name])
-    note = "replicate definition pending (see README): verdict withheld"
-    rows = [
-        {"hypothesis": "P2", "view": view_name, "variant": "pending", "statement":
-         f"of Phase 1's flipped decisions, at least {p2_min} replicate at 10 trials",
-         "n_decisions": v2["n_reference_decisions"], "n_flipped": None, "value": None, "threshold": p2_min,
-         "supported": None, "note": note},
-        {"hypothesis": "P6", "view": view_name, "variant": "pending", "statement":
-         f"{f5_name} same-hardware flips at least {p6_min} of the decisions it flipped in Phase 1",
-         "n_decisions": v6["n_reference_decisions"], "n_flipped": None, "value": None, "threshold": p6_min,
-         "supported": None, "note": note},
-    ]
-    var_rows = []
-    for hyp, v, thr in (("P2", v2, p2_min), ("P6", v6, p6_min)):
-        for k, n in v.items():
+    v2 = replication_variants(reference_flip_index(ref_rows, cfg, h1), flips)
+    v6 = replication_variants(reference_flip_index(ref_rows, cfg, [f5_name]), flips, factors=[f5_name])
+    rows, var_rows = [], []
+    for hyp, v, thr, text in (
+            ("P2", v2, p2_min, f"of Phase 1's flipped decisions, at least {p2_min} replicate at 10 trials"),
+            ("P6", v6, p6_min, f"{f5_name} same-hardware replicates for at least {p6_min} of the decisions it "
+                               "flipped in Phase 1")):
+        n = v[PRIMARY_READING]
+        rows.append({"hypothesis": hyp, "view": view_name, "variant": PRIMARY_READING, "statement": text,
+                     "n_decisions": v["n_reference_decisions"], "n_flipped": n, "value": n, "threshold": thr,
+                     "supported": n >= thr,
+                     "note": "value = replicated decisions; same label change, any originally flipping factor"})
+        for k, cnt in v.items():
             if k == "n_reference_decisions":
                 continue
             direction, multi = k.split("/")
             var_rows.append({"hypothesis": hyp, "view": view_name, "direction_rule": direction,
-                             "multi_factor_rule": multi, "n_reference_decisions": v["n_reference_decisions"],
-                             "n_replicated": n, "threshold": thr, "would_be_supported": n >= thr})
+                             "multi_factor_rule": multi, "primary": k == PRIMARY_READING,
+                             "n_reference_decisions": v["n_reference_decisions"], "n_replicated": cnt,
+                             "threshold": thr, "would_be_supported": cnt >= thr})
     return rows, var_rows
 
 

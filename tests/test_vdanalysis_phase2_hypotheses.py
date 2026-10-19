@@ -28,7 +28,7 @@ def test_p1(world):
     assert (r["ci95_lo"], r["ci95_hi"]) == clopper_pearson(6, 8) and r["supported"] is True
     assert {x["variant"]: x for x in p1_rows(an, flips)}["main/size_changing"]["value"] is None
 
-def test_replication_variants_and_withheld_verdict(world):
+def test_p2_p6_primary_reading_and_the_other_three_as_descriptive(world):
     cfg, _, an, _ = world
     ref = list(csv.DictReader(open(world[1]["reference"], encoding="utf-8")))
     flips = an.flip_table(list(cfg.groups["h1"]))
@@ -40,9 +40,37 @@ def test_replication_variants_and_withheld_verdict(world):
     v6 = replication_variants(reference_flip_index(ref, cfg, ["F5"]), flips, factors=["F5"])
     assert v6["n_reference_decisions"] == 2 and {v6[k] for k in v6 if k != "n_reference_decisions"} == {1}
     rows, var_rows = p2_p6_rows(an, flips, ref)
-    assert {r["hypothesis"]: r["supported"] for r in rows} == {"P2": None, "P6": None}
-    assert all("pending" in r["note"] for r in rows)
+    by_h = {r["hypothesis"]: r for r in rows}
+    # section 5: primary = any originally flipping factor, same label change
+    assert (by_h["P2"]["value"], by_h["P2"]["n_decisions"], by_h["P2"]["threshold"], by_h["P2"]["supported"]) == (3, 5, 7, False)
+    assert (by_h["P6"]["value"], by_h["P6"]["n_decisions"], by_h["P6"]["threshold"], by_h["P6"]["supported"]) == (1, 2, 4, False)
+    assert by_h["P2"]["variant"] == "labels/any"
+    # all four readings are kept as descriptive outputs, the primary one marked
     assert len(var_rows) == 8 and all(r["n_replicated"] <= r["n_reference_decisions"] for r in var_rows)
+    prim = [r for r in var_rows if r["primary"]]
+    assert {(r["hypothesis"], r["direction_rule"], r["multi_factor_rule"]) for r in prim} ==         {("P2", "labels", "any"), ("P6", "labels", "any")}
+    assert {(r["direction_rule"], r["multi_factor_rule"]): r["n_replicated"] for r in var_rows if r["hypothesis"] == "P2"} ==         {("labels", "any"): 3, ("labels", "all"): 2, ("sign", "any"): 3, ("sign", "all"): 2}
+
+
+def _flip(factor, pair, suite, d, f):
+    return {"factor": factor, "pair": pair, "suite": suite, "d_label": d, "factor_label": f, "flipped": d != f}
+
+
+def test_replicate_needs_the_same_label_change_including_the_starting_label():
+    ref = {("p", "s"): [{"factor": "F5", "d_label": "neutral", "factor_label": "harmful"}]}
+    assert replication_variants(ref, [_flip("F5", "p", "s", "neutral", "harmful")])["labels/any"] == 1
+    # D label at 10 trials differs from Phase 1's: the same end label is not enough
+    assert replication_variants(ref, [_flip("F5", "p", "s", "beneficial", "harmful")])["labels/any"] == 0
+    # but the same sign of the change counts under the descriptive 'sign' reading
+    assert replication_variants(ref, [_flip("F5", "p", "s", "beneficial", "harmful")])["sign/any"] == 1
+    # no flip at 10 trials, or a flip under another factor: not a replication
+    assert replication_variants(ref, [_flip("F5", "p", "s", "harmful", "harmful")])["labels/any"] == 0
+    assert replication_variants(ref, [_flip("F1", "p", "s", "neutral", "harmful")])["labels/any"] == 0
+    # any originally flipping factor suffices; 'all' needs every one of them
+    ref2 = {("p", "s"): [{"factor": "F1", "d_label": "neutral", "factor_label": "harmful"},
+                         {"factor": "F7", "d_label": "neutral", "factor_label": "harmful"}]}
+    v = replication_variants(ref2, [_flip("F1", "p", "s", "neutral", "harmful")])
+    assert (v["labels/any"], v["labels/all"]) == (1, 0)
 
 def test_new_flips_are_those_phase1_did_not_see(world):
     cfg, _, an, _ = world
