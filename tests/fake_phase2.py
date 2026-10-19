@@ -17,8 +17,8 @@ fresh in results_v3. A "failing task" fails all its stress records of the listed
   A/A      D_AA2: c_old fails t0-t5 in sampled trials only (-0.27, point gate false alarm);
            R_AA2: a_old fails t0-t5 sampled only (false alarm), d_old fails t0-t1 sampled only (-0.09:
            point label harmful, CI label neutral)
-  PC       R_PC_Q2K: a_new,c_new,d_new fail t0-t11, b_new fails t0-t1 (not detected by the CI gate)
-           R_PC_NODESC (a_new,b_new): baseline condition fails t0-t7 -> invisible to the stress gate
+  PC       R_PC_Q2K (W2b, 10 trials): a_new,c_new,d_new fail t0-t11, b_new fails t0-t1 (not detected by the CI gate)
+           R_PC_NODESC (W2b): a_new,b_new baseline condition fails t0-t7 -> invisible to the stress gate
   W3       W3_D adds tasks t020-t029; a_new fails t020-t027 there -> pair a: neutral on the original
            tasks, harmful on the full set
 """
@@ -161,12 +161,14 @@ def build_phase2_world(root: Path) -> tuple[dict, dict[str, Path]]:
     for m in ("b_old", "b_new", "d_old", "d_new"):             # R_F5: Phase 1 only (3 trials)
         for su in SUITES:
             write_part(v2, "R_F5", "R_F5", m, su, range(0, 3), 0)
-    for m in ("a_new", "b_new", "c_new", "d_new"):
+    for m in ("a_new", "b_new", "c_new", "d_new"):             # W2b: Phase 1 trials 0-2 + new trials 3-9
         for su in SUITES:
             write_part(v2, "R_PC_Q2K", "R_PC_Q2K", m, su, range(0, 3), 0)
+            write_part(v3, "R_PC_Q2K", "R_PC_Q2K", m, su, range(3, 10), 3)
     for m in ("a_new", "b_new"):
         for su in SUITES:
             write_part(v2, "R_PC_NODESC", "R_PC_NODESC", m, su, range(0, 3), 0)
+            write_part(v3, "R_PC_NODESC", "R_PC_NODESC", m, su, range(3, 10), 3)
     for proto in ("D", "R"):                                   # W3 added tasks (separate runs, all 10 trials)
         for m in MODELS:
             for su in SUITES:
@@ -204,6 +206,9 @@ def build_phase2_world(root: Path) -> tuple[dict, dict[str, Path]]:
             "D_AA2": {"folder": "D_AA2", "control_only": True}, "R_AA2": {"folder": "R_AA2", "control_only": True},
             "R_PC_Q2K": {"folder": "R_PC_Q2K", "control_only": True},
             "R_PC_NODESC": {"folder": "R_PC_NODESC", "control_only": True},
+            "R_P1": {"folder": "R", "control_only": True},
+            "R_PC_Q2K_P1": {"folder": "R_PC_Q2K", "control_only": True},
+            "R_PC_NODESC_P1": {"folder": "R_PC_NODESC", "control_only": True},
             "R_F5": {"folder": "R_F5", "models": ["b_old", "b_new", "d_old", "d_new"]},
             "D_W3": {"folder": "D", "control_only": True}, "R_W3": {"folder": "R", "control_only": True},
         },
@@ -252,13 +257,23 @@ def build_phase2_world(root: Path) -> tuple[dict, dict[str, Path]]:
                                    {"root": "v3", "folder": "R", "trial_offset": 3, "overrides": False},
                                    {"root": "v3", "folder": "W3_R", "trial_offset": 0, "overrides": False}]},
                 "F10": {"view_of": "D", "trials": "greedy"},
-                "R_F5": {"n_trials": 3}, "R_PC_Q2K": {"n_trials": 3}, "R_PC_NODESC": {"n_trials": 3},
+                "R_PC_Q2K": {"parts": laptop_w1}, "R_PC_NODESC": {"parts": laptop_w1},
+                # Phase 1 records only (3 trials): for the descriptive secondary-gate table
+                "R_P1": {"parts": [{"root": "results_root", "folder": "R"}], "n_trials": 3},
+                "R_PC_Q2K_P1": {"parts": [{"root": "results_root", "folder": "R_PC_Q2K"}], "n_trials": 3},
+                "R_PC_NODESC_P1": {"parts": [{"root": "results_root", "folder": "R_PC_NODESC"}], "n_trials": 3},
+                "R_F5": {"n_trials": 3},
             },
             "f6_trim": {"protocol": "F6", "base": "D", "models": "f6_equals_d"},
             "same_hardware": {"F5": {"baseline": "D_KAGGLE", "models": "kaggle_d"},
                               "R_F5": {"baseline": "R_KAGGLE", "models": "kaggle_r"}},
             "hypotheses": {"p1_threshold": 0.20, "p2_min_replicated": 7, "p3_max": 0.05, "p4_min": 0.90,
                            "p6_min_replicated": 4},
+            "descriptive_controls": [
+                {"name": "P1_PC_Q2K_R", "kind": "pc", "protocol_a": "R_P1", "protocol_b": "R_PC_Q2K_P1", "gate": "ci",
+                 "models": ["a_new", "b_new", "c_new", "d_new"]},
+                {"name": "P1_PC_NODESC_R", "kind": "pc", "protocol_a": "R_P1", "protocol_b": "R_PC_NODESC_P1", "gate": "ci",
+                 "models": ["a_new", "b_new"]}],
             "p3_control": "AA2_R", "p4_control": "PC_Q2K_R", "p5_control": "PC_NODESC_R", "f5_aa_control": "AA2_D",
             "w3": {"protocols": {"D": {"protocol": "D_W3", "gate": "point"}, "R": {"protocol": "R_W3", "gate": "ci"}},
                    "original_tasks": orig},

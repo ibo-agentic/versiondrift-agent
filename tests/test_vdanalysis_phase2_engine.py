@@ -22,7 +22,8 @@ def test_merged_laptop_run_has_ten_trials_and_no_hard_coded_size(world):
     run = an.run_for("D", "a_new", "s1")
     assert run.trials == list(range(10)) and len(run) == N_TASKS * 3 * 10
     assert run.warnings == []
-    assert an.store.get("R_PC_Q2K", "a_new", "s1").trials == [0, 1, 2]          # Phase 1 only
+    assert an.store.get("R_PC_Q2K", "a_new", "s1").trials == list(range(10))     # W2b: Phase 1 trials + new trials
+    assert an.store.get("R_PC_Q2K_P1", "a_new", "s1").trials == [0, 1, 2]       # Phase 1 records alone
 
 def test_kaggle_f5_models_use_only_the_fresh_part_and_phase1_f5_is_not_read(world):
     cfg, _, an, _ = world
@@ -117,7 +118,7 @@ def test_secondary_gate_sees_what_the_stress_gate_cannot(controls):
     for r in by(controls, "PC_NODESC_R"):
         assert r["stress_diff"] == 0 and r["label"] == "neutral"
         assert r["full_diff"] == pytest.approx(-0.4 / 3) and r["full_label"] == "harmful"
-        assert r["n_records"] == N_TASKS * 2 * 3                      # 3-trial control vs 10-trial R: shared trials
+        assert r["n_records"] == N_TASKS * 2 * 10                     # W2b: 10 trials, same as the W1 R run
 
 def test_primary_gate_columns_are_unchanged_by_the_secondary_gate(world):
     _, _, an, _ = world

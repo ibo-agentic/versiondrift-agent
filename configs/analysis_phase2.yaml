@@ -30,6 +30,11 @@ protocols:
   R_W3: {folder: R, control_only: true, confounded_models: {qwen3: grammar+thinking_blocked}}
   # F10 in Phase 2 is D's greedy trial, taken from the D records (no files).
   F10: {folder: F10}
+  # Phase 1 control records alone (3 trials): only for the descriptive secondary-gate table.
+  R_P1: {folder: R, control_only: true}
+  R_AA_P1: {folder: R_AA, control_only: true}
+  R_PC_Q2K_P1: {folder: R_PC_Q2K, control_only: true}
+  R_PC_NODESC_P1: {folder: R_PC_NODESC, control_only: true}
 
 phase2:
   mode: phase2
@@ -85,10 +90,16 @@ phase2:
         - {root: v3, folder: R, trial_offset: 3, overrides: false}
         - {root: v3, folder: W3_R, trial_offset: 0, overrides: false}
     F10: {view_of: D, trials: greedy}
+    # W2b: positive controls at 10 trials on the laptop: Phase 1 trials 1-3 (results_v2) + new trials 4-10
+    # (results_v3, trial seeds 1237-1243), compared against the W1 laptop R runs. Same model scope as Phase 1.
+    R_PC_Q2K: {parts: *laptop_w1}
+    R_PC_NODESC: {parts: *laptop_w1}
     # Phase 1 only (3 trials); comparisons against 10-trial runs use the trials they share.
     R_F5: {n_trials: 3}
-    R_PC_Q2K: {n_trials: 3}
-    R_PC_NODESC: {n_trials: 3}
+    R_P1: {parts: [{root: results_root, folder: R}], n_trials: 3}
+    R_AA_P1: {parts: [{root: results_root, folder: R_AA}], n_trials: 3, seed_base: 5678}
+    R_PC_Q2K_P1: {parts: [{root: results_root, folder: R_PC_Q2K}], n_trials: 3}
+    R_PC_NODESC_P1: {parts: [{root: results_root, folder: R_PC_NODESC}], n_trials: 3}
 
   f6_trim: {protocol: F6, base: D, models: f6_equals_d}
 
@@ -102,9 +113,17 @@ phase2:
     p3_max: 0.05
     p4_min: 0.90
     p6_min_replicated: 4
+  # Descriptive (PLAN_PHASE2.md W4): the secondary gate on Phase 1's own control records, no new runs.
+  descriptive_controls:
+    - {name: P1_AA_R, kind: aa, protocol_a: R_P1, protocol_b: R_AA_P1, gate: ci,
+       models: [mistral_v02, qwen2, qwen25, llama31, phi35_mini, granite31]}
+    - {name: P1_PC_Q2K_R, kind: pc, protocol_a: R_P1, protocol_b: R_PC_Q2K_P1, gate: ci,
+       models: [mistral_v03, qwen25, llama31, granite32]}
+    - {name: P1_PC_NODESC_R, kind: pc, protocol_a: R_P1, protocol_b: R_PC_NODESC_P1, gate: ci,
+       models: [mistral_v03, qwen25, llama31, granite32]}
   p3_control: AA2_R
-  p4_control: PC_Q2K_R
-  p5_control: PC_NODESC_R
+  p4_control: PC_Q2K_R          # W2b, 10 trials
+  p5_control: PC_NODESC_R       # W2b, 10 trials
   f5_aa_control: AA2_D          # the A/A used as noise bound for F5 shifts (F5 is a D-protocol factor)
   p6_factor: F5
 
