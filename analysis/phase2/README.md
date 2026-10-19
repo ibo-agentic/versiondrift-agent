@@ -58,27 +58,32 @@ models and pairs.
 
 ## Things to know
 
+* **Matches PLAN_PHASE2.md v4.**
 * **Layout assumption.** The plan does not say where `results_v3` stores things. The config assumes it
   mirrors `results_v2`: `<folder>/<model>/<suite>/<run_id>/parsed_results.jsonl` (+ `raw_outputs.jsonl`),
-  with these folder names: `D R F1 F2 F3 F4_json F5 F6` (new trials 3-9 for laptop runs; all 10 trials
-  for the Kaggle F5 models), `D_KAGGLE R_KAGGLE` (Kaggle baselines), `D_AA2 R_AA2` (second A/A arm),
-  `W3_D W3_R` (added tasks), plus `rescored_v3/F7 F8`. If the runs are written elsewhere, only the
-  config changes.
+  with these folder names: `D R F1 F2 F3 F4_json F5 F6` (new trials 4-10 for laptop runs; all 10 trials
+  for the Kaggle F5 models), `R_PC_Q2K R_PC_NODESC` (W2b), `D_KAGGLE R_KAGGLE` (Kaggle baselines),
+  `D_AA2 R_AA2` (second A/A arm), `W3_D W3_R` (added tasks), plus `rescored_v3/F7 F8`. If the runs are
+  written elsewhere, only the config changes.
 * **Trial numbering.** The new laptop runs store their trials as 0-6. The config says `trial_offset: 3`
   for them, and `merge.py` checks the trial seed (1237...1243) so a wrong offset cannot slip through.
-* **Trial counts can differ between runs.** Comparing a 10-trial run with a 3-trial run (for example
-  R_F5 or the positive controls, which are Phase 1 only) uses the trials they share.
-* **Kaggle reuse** (PLAN_PHASE2.md section 2, pending W0 Part C): the config currently runs all
-  10 Kaggle trials fresh. If reuse is allowed, replace one line of the `F5` entry (marked in the config).
-* **Not decided by the plan: what counts as "replicate"** (P2, P6). A Phase 1 decision may have flipped
-  under several factors, and "same direction" can mean the same label change or the same sign.
-  The code computes the count under every reading (`p2_p6_replication_variants.csv`) and leaves the
-  P2/P6 verdict as *pending* until the plan says which reading is meant.
-* **Not covered by any workstream: data for P4 and P5.** They need the positive controls (Q2_K and
-  no-description) *under R*. The plan has no run for them at 10 trials, so by default the code reads the
-  Phase 1 control records (3 trials) and compares them with the 10-trial R run on the trials they share.
-  If new control runs are made, add parts for `R_PC_Q2K` / `R_PC_NODESC` in the config.
-* **The secondary gate's score.** "Baseline + stress" is taken as the equal-weight average of the three
-  conditions, the same convention the stress diff uses for its two conditions.
-* **F5 "noise bound".** Descriptive only: the largest and the 95th-percentile |stress difference| over the
-  D-gate A/A decisions, next to each F5 shift.
+* **Trial counts can differ between runs.** Comparing a 10-trial run with a 3-trial run (R_F5, or Phase 1's
+  own control records) uses the trials they share.
+* **Kaggle reuse** (plan section 2, decided by W0 Part C): the config currently runs all 10 Kaggle trials
+  fresh. If reuse is allowed, replace one line of the `F5` entry (marked in the config).
+* **"Replicate" (P2, P6), plan section 5.** A Phase 1 flipped decision replicates if, at 10 trials, it flips
+  under at least one of the factors that flipped it in Phase 1, with the same label change (its D label
+  equals its Phase 1 D label, its label under that factor equals the Phase 1 label under that factor).
+  P6 is the same rule under F5 only, starting from the same-hardware D label. The other three readings
+  (every originally flipping factor must replicate; same sign of the change instead of same label change;
+  both) are written to `p2_p6_replication_variants.csv` as descriptive output, with the primary one marked.
+  They never decide a verdict.
+* **P4 and P5 read W2b**: the Q2_K and no-description controls at 10 trials on the laptop (Phase 1 trials
+  1-3 reused, trials 4-10 new), compared with the W1 laptop R runs on all 10 trials.
+* **Secondary gate on Phase 1's own control records** (3 trials, no new runs) is a descriptive table only
+  (`phase1_controls_secondary*.csv`); it feeds no hypothesis.
+* **The secondary gate's score** is the equal-weight average of the three conditions (baseline,
+  schema_drift, fault_reporting), as in plan W4.
+* **F5 noise bound.** Descriptive only. Headline: the 95th percentile (linear interpolation, NumPy's
+  default) of |stress difference| over the W2 D A/A decisions, next to each F5 shift; the maximum is
+  reported too.

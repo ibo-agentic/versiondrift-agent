@@ -1,6 +1,7 @@
 # Regression check: Phase 2 code in Phase 1 mode vs the frozen Phase 1 tables
 
-Run on 2026-10-19 on Phase 1 data only (`results_v2/`, `rescored/`), 3 trials, primary gate only,
+Run on 2026-10-19 (first build) and re-run on 2026-10-19 after the update to PLAN_PHASE2.md v4 (same result both times),
+on Phase 1 data only (`results_v2/`, `rescored/`), 3 trials, primary gate only,
 old A/A (different run seed, records matched on drift/fault type), no F6 trimming, no same-hardware
 baselines. Command:
 
@@ -20,7 +21,7 @@ Every cell of each table was compared as text with the table written by the orig
 | controls_summary | 3 / 3 | 0 |
 | hypotheses (H1-H5, all variants) | 19 / 19 | 0 |
 
-**Total differences: 0.** Run time 2 min 25 s. No loader warnings, no missing runs.
+**Total differences: 0.** Run time 2 min 25 s (first run), 2 min 01 s (re-run after the v4 update). No loader warnings, no missing runs.
 
 Side result: the merge checks (prompts byte-identical across the trials of every (task, condition),
 no duplicate (task, condition, trial), seeds equal to 1234 + trial index, one temperature per trial)
