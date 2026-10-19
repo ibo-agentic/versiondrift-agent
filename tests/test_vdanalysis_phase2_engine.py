@@ -185,10 +185,23 @@ def test_f5_shift_against_aa_noise(world, controls):
     rows = {(r["model"], r["suite"]): r for r in f5_shift_vs_aa(an, controls, "AA2_D")}
     d_new = rows[("d_new", "s1")]
     assert d_new["f5_shift"] == pytest.approx(-0.30) and d_new["baseline_protocol"] == "D"
+    # headline bound = 95th percentile (linear interpolation) of |stress diff| over the 16 D A/A decisions
+    assert d_new["noise_bound"] == pytest.approx(0.27) and d_new["exceeds_noise_bound"] is True
     assert d_new["aa_max_abs_diff"] == pytest.approx(0.27) and d_new["exceeds_aa_max"] is True
     b_new = rows[("b_new", "s1")]
-    assert b_new["baseline_protocol"] == "D_KAGGLE" and b_new["f5_shift"] == 0 and b_new["exceeds_aa_max"] is False
-    assert f5_shift_vs_aa(an, [], "AA2_D")[0]["aa_max_abs_diff"] is None
+    assert b_new["baseline_protocol"] == "D_KAGGLE" and b_new["f5_shift"] == 0
+    assert b_new["exceeds_noise_bound"] is False and b_new["exceeds_aa_max"] is False
+    none = f5_shift_vs_aa(an, [], "AA2_D")[0]
+    assert none["noise_bound"] is None and none["aa_max_abs_diff"] is None
+
+
+def test_noise_bound_is_the_95th_percentile_not_the_max():
+    from vdanalysis.phase2.descriptive import _quantile
+    xs = [0.0] * 18 + [0.1, 0.5]                    # 20 values; type-7 95th percentile = 0.1 + 0.4 * 0.05
+    assert _quantile(xs, 0.95) == pytest.approx(0.1 + 0.4 * 0.05)
+    assert _quantile(xs, 0.95) < max(xs)
+    assert _quantile([0.2], 0.95) == 0.2 and _quantile([], 0.95) is None
+    assert _quantile([0.0, 1.0], 0.5) == 0.5
 
 def test_missing_runs_fail_loudly_or_are_listed(world, tmp_path):
     cfg, _, _, root = world

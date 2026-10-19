@@ -143,6 +143,12 @@ def run_phase2_mode(cfg: Phase2Config, out_dir: Path, with_ci: bool = True, allo
     aa_d = cfg.p2.get("f5_aa_control", "AA2_D")
     tables["f5_shift_vs_aa"] = f5_shift_vs_aa(an, main["controls"], aa_d)
     tables["r_f5_same_hardware"] = r_f5_same_hardware(an)
+    # descriptive: the secondary gate on Phase 1's own control records (3 trials, no new runs)
+    d_ctl = cfg.p2.get("descriptive_controls")
+    if d_ctl:
+        rows = control_rows2(an, secondary=True, controls=d_ctl)
+        tables["phase1_controls_secondary"] = rows
+        tables["phase1_controls_secondary_summary"] = per_control_summary2(rows)
     if ref_rows is not None:
         tables["new_flips"] = new_flips(main["flips"], ref_rows)
     if labels_path:

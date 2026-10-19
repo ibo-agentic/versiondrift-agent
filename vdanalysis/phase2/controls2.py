@@ -75,10 +75,11 @@ def _greedy_scores_identical(old: Run, new: Run) -> bool | None:
     return all(old.keys[k][0] == new.keys[k][0] for k in keys) if keys else None
 
 
-def control_rows2(an: Analysis, secondary: bool = False) -> list[dict[str, Any]]:
+def control_rows2(an: Analysis, secondary: bool = False, controls: list[dict] | None = None) -> list[dict[str, Any]]:
+    """Rows for ``controls`` (default: the config's ``controls``)."""
     cfg = an.cfg
     out = []
-    for ctl in cfg.controls:
+    for ctl in (cfg.controls if controls is None else controls):
         kind = ctl["kind"]
         if kind not in EXPECTED:
             raise ValueError(f"control {ctl['name']}: unknown kind {kind!r}")

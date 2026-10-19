@@ -2,7 +2,7 @@
 
 Pure formatting: takes the tables produced by ``run_phase2_mode`` and writes a
 single readable page. It never recomputes anything and never decides anything;
-a hypothesis whose verdict is withheld is shown as "pending".
+a hypothesis that cannot be tested (no data) is shown as "not testable".
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 
 from ..run_analysis import _fmt, _md_table
 
-VERDICT = {True: "supported", False: "not supported", None: "pending / not testable"}
+VERDICT = {True: "supported", False: "not supported", None: "not testable"}
 
 
 def _verdict(v: Any) -> str:
@@ -48,11 +48,11 @@ def build_report(cfg, res: dict[str, Any]) -> str:
     lines.append(_section("Hypotheses P1-P6 (all trials)", main,
                           ["hypothesis", "variant", "statement", "n_decisions", "n_flipped", "value", "ci95",
                            "threshold", "comparison_value", "verdict", "note"],
-                          "Intervals are exact Clopper-Pearson 95%. P2 and P6 verdicts are withheld until the "
-                          "meaning of 'replicate' is fixed in the plan (see the variants table below)."))
-    lines.append(_section("P2 / P6 under each reading of 'replicate'",
+                          "Intervals are exact Clopper-Pearson 95%. P2 and P6: value = number of Phase 1 flipped "
+                          "decisions that replicate (section 5: any originally flipping factor, same label change)."))
+    lines.append(_section("P2 / P6 under the other readings of 'replicate' (descriptive; the primary reading is marked)",
                           [r for r in t.get("p2_p6_replication_variants", []) if r.get("view") == "all"],
-                          ["hypothesis", "direction_rule", "multi_factor_rule", "n_reference_decisions", "n_replicated",
+                          ["hypothesis", "direction_rule", "multi_factor_rule", "primary", "n_reference_decisions", "n_replicated",
                            "threshold", "would_be_supported"]))
     lines.append(_section("P7 (descriptive, only if W3 ran)", t.get("p7", []),
                           ["protocol", "gate", "suite", "n_decisions", "n_differ", "share", "ci95_lo", "ci95_hi",
@@ -76,8 +76,14 @@ def build_report(cfg, res: dict[str, Any]) -> str:
                           ["pair", "suite", "laptop_diff", "kaggle_diff", "hardware_diff", "laptop_label",
                            "kaggle_label", "labels_agree"]))
     lines.append(_section("F5 per-model shift (same hardware) vs A/A noise", t.get("f5_shift_vs_aa", []),
-                          ["model", "suite", "baseline_protocol", "f5_shift", "aa_max_abs_diff", "aa_p95_abs_diff",
-                           "exceeds_aa_max", "exceeds_aa_p95"]))
+                          ["model", "suite", "baseline_protocol", "f5_shift", "noise_bound", "exceeds_noise_bound",
+                           "aa_max_abs_diff", "exceeds_aa_max"],
+                          "noise_bound = 95th percentile of |stress diff| over the W2 D A/A decisions (headline); "
+                          "the maximum is shown next to it."))
+    lines.append(_section("Secondary full-score gate on Phase 1's control records (descriptive)",
+                          t.get("phase1_controls_secondary_summary", []),
+                          ["control", "kind", "gate", "n_decisions", "n_flagged", "detection_rate", "false_alarm_rate",
+                           "full_n_flagged", "full_detection_rate", "full_false_alarm_rate"]))
     lines.append(_section("New flips not seen in Phase 1", t.get("new_flips", []),
                           ["factor", "pair", "suite", "d_label", "factor_label", "confounding"]))
     if "human_agreement" in t:

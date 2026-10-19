@@ -44,7 +44,8 @@ def test_run_phase2_mode_end_to_end(world, tmp_path):
     assert {"decisions_D", "decisions_all_protocols", "decisions_baselines", "factor_flips_long", "flip_rates_by_factor",
             "controls", "controls_summary", "hypotheses_p", "p2_p6_replication_variants", "views_flips",
             "views_controls", "views_flip_rates", "hw_noise_runs", "hw_noise_pairs", "f5_shift_vs_aa",
-            "r_f5_same_hardware", "new_flips", "p7"} <= names
+            "r_f5_same_hardware", "new_flips", "p7", "phase1_controls_secondary",
+            "phase1_controls_secondary_summary"} <= names
     hyp = read_csv_rows(out / "hypotheses_p.csv")
     views = {r["view"] for r in hyp}
     assert views == {"all", "greedy", "sampled"}
@@ -60,7 +61,7 @@ def test_report_is_generated(world, tmp_path):
     res = run_phase2_mode(cfg, tmp_path / "o", with_ci=True)
     path = write_report(cfg, res, tmp_path / "analysis" / "phase2" / "analysis_report.md")
     text = path.read_text(encoding="utf-8")
-    assert "# Phase 2 analysis report" in text and "pending" in text and "P1" in text and "P7" in text
+    assert "# Phase 2 analysis report" in text and "P1" in text and "P7" in text
     assert "Clopper-Pearson" in text
 
 def test_output_inside_protected_folders_is_refused(tmp_path):
@@ -76,3 +77,19 @@ def test_phase2_code_only_reads_the_record_trees(world):
     run_phase2_mode(cfg, root / "scratch_out", with_ci=False)
     after = {p: p.stat().st_mtime_ns for p in before}
     assert before == after
+
+
+def test_secondary_gate_on_phase1_control_records_is_descriptive(world, tmp_path):
+    """Phase 1 control records (3 trials), primary columns untouched, secondary columns added."""
+    cfg, _, _, _ = world
+    out = tmp_path / "o"
+    run_phase2_mode(cfg, out, with_ci=True)
+    rows = read_csv_rows(out / "phase1_controls_secondary.csv")
+    nod = [r for r in rows if r["control"] == "P1_PC_NODESC_R"]
+    assert len(nod) == 4 and all(r["n_records"] == str(N_TASKS * 2 * 3) for r in nod)   # 3 trials only
+    assert all(r["label"] == "neutral" and r["full_label"] == "harmful" for r in nod)
+    summ = {r["control"]: r for r in read_csv_rows(out / "phase1_controls_secondary_summary.csv")}
+    assert summ["P1_PC_NODESC_R"]["detection_rate"] == "0.000000" and summ["P1_PC_NODESC_R"]["full_detection_rate"] == "1.000000"
+    # not mixed into the hypotheses: P4/P5 read the 10-trial W2b controls
+    hyp = [r for r in read_csv_rows(out / "hypotheses_p.csv") if r["view"] == "all" and r["hypothesis"] in ("P4", "P5")]
+    assert {r["hypothesis"]: r["n_decisions"] for r in hyp} == {"P4": "8", "P5": "4"}

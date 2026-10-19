@@ -18,10 +18,14 @@ from .stats2 import cohen_kappa
 
 
 def _quantile(xs: list[float], q: float) -> float | None:
+    """Linear-interpolation quantile (the usual 'type 7' definition, NumPy's default)."""
     if not xs:
         return None
     s = sorted(xs)
-    return s[max(0, min(len(s) - 1, round(q * (len(s) - 1))))]
+    pos = q * (len(s) - 1)
+    lo = int(pos)
+    hi = min(lo + 1, len(s) - 1)
+    return s[lo] + (s[hi] - s[lo]) * (pos - lo)
 
 
 def _paired(an: Phase2Analysis, old, new, conds) -> dict[str, Any]:
@@ -83,9 +87,12 @@ def hw_noise_pairs(an: Phase2Analysis) -> list[dict[str, Any]]:
 # ---- F5 shift vs A/A noise -------------------------------------------------------
 def f5_shift_vs_aa(an: Phase2Analysis, aa_rows: list[dict], aa_control: str) -> list[dict[str, Any]]:
     """Per model x suite: F5's paired stress-score shift against the baseline on
-    the same hardware, next to the A/A noise of the same gate family (largest
-    and 95th-percentile |stress diff| over the A/A control's decisions). Any
-    number of A/A decisions is fine; with none, the bounds are empty."""
+    the same hardware, next to the A/A noise (PLAN_PHASE2.md section 4).
+
+    Headline bound (``noise_bound``) = 95th percentile of |stress diff| over the
+    W2 D A/A decisions; the maximum is reported next to it. ``exceeds_noise_bound``
+    compares |shift| with the headline bound. With no A/A decisions the bounds are
+    empty."""
     c = an.cfg
     f = c.factors.get("F5")
     if not f:
@@ -107,9 +114,10 @@ def f5_shift_vs_aa(an: Phase2Analysis, aa_rows: list[dict], aa_control: str) -> 
                 continue
             out.append({"model": model, "suite": suite, "baseline_protocol": base_proto, "n_stress_records": r["n"],
                         "f5_shift": r["diff"], "aa_control": aa_control, "n_aa_decisions": len(noise),
-                        "aa_max_abs_diff": bound_max, "aa_p95_abs_diff": bound_p95,
-                        "exceeds_aa_max": None if bound_max is None else abs(r["diff"]) > bound_max,
-                        "exceeds_aa_p95": None if bound_p95 is None else abs(r["diff"]) > bound_p95})
+                        "noise_bound": bound_p95, "exceeds_noise_bound":
+                        None if bound_p95 is None else abs(r["diff"]) > bound_p95,
+                        "aa_max_abs_diff": bound_max, "exceeds_aa_max":
+                        None if bound_max is None else abs(r["diff"]) > bound_max})
     return out
 
 
