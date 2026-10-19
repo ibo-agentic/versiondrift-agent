@@ -24,6 +24,7 @@ from ..controls import per_control_summary
 from ..run_analysis import write_csv
 from .analysis import Phase2Analysis, ViewSpec
 from .config import Phase2Config, load_phase2_config
+from .clusters import cluster_rows, cluster_summary
 from .controls2 import control_rows2, per_control_summary2
 from .descriptive import (agreement_rows, f5_shift_vs_aa, hw_noise_pairs, hw_noise_runs, new_flips, r_f5_same_hardware,
                           read_labels)
@@ -143,6 +144,11 @@ def run_phase2_mode(cfg: Phase2Config, out_dir: Path, with_ci: bool = True, allo
     aa_d = cfg.p2.get("f5_aa_control", "AA2_D")
     tables["f5_shift_vs_aa"] = f5_shift_vs_aa(an, main["controls"], aa_d)
     tables["r_f5_same_hardware"] = r_f5_same_hardware(an)
+    # descriptive: cluster bootstrap (tasks sharing a baseline prompt form one cluster) for suites with repeated prompts
+    cl = cluster_rows(an, decision_protocols(cfg))
+    if cl:
+        tables["cluster_bootstrap"] = cl
+        tables["cluster_bootstrap_summary"] = cluster_summary(cl)
     # descriptive: the secondary gate on Phase 1's own control records (3 trials, no new runs)
     d_ctl = cfg.p2.get("descriptive_controls")
     if d_ctl:

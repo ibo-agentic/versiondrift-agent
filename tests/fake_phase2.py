@@ -72,7 +72,10 @@ def spec_table() -> dict[tuple, dict]:
 SPECS = spec_table()
 
 
-def prompt_sha(run_seed: int, task: int, cond: str) -> str:
+def prompt_sha(run_seed: int, task: int, cond: str, suite: str = "s2") -> str:
+    """Suite s1 repeats its baseline prompt (tasks 2k and 2k+1 share it, like the synthetic suite); s2 never does."""
+    if suite == "s1" and cond == "baseline":
+        task = task // 2
     return hashlib.sha256(f"{run_seed}|{task}|{cond}".encode()).hexdigest()
 
 
@@ -97,7 +100,7 @@ def write_part(root: Path, folder: str, spec_key: str, model: str, suite: str, t
                 row["temperature"] = 0.0 if t == 0 else 0.7
                 parsed.append(row)
                 raws.append({"task_id": row["task_id"], "condition": cond, "trial_index": t - offset,
-                             "prompt_sha256": prompt_sha(run_seed, task, cond), "raw_output": "{}", "truncated": False})
+                             "prompt_sha256": prompt_sha(run_seed, task, cond, suite), "raw_output": "{}", "truncated": False})
     with open(run_dir / "parsed_results.jsonl", "w", encoding="utf-8") as fh:
         fh.write("".join(json.dumps(r, sort_keys=True) + "\n" for r in parsed))
     if raw:
@@ -274,6 +277,7 @@ def build_phase2_world(root: Path) -> tuple[dict, dict[str, Path]]:
                  "models": ["a_new", "b_new", "c_new", "d_new"]},
                 {"name": "P1_PC_NODESC_R", "kind": "pc", "protocol_a": "R_P1", "protocol_b": "R_PC_NODESC_P1", "gate": "ci",
                  "models": ["a_new", "b_new"]}],
+            "cluster_bootstrap": {"suites": ["s1", "s2"]},
             "p3_control": "AA2_R", "p4_control": "PC_Q2K_R", "p5_control": "PC_NODESC_R", "f5_aa_control": "AA2_D",
             "w3": {"protocols": {"D": {"protocol": "D_W3", "gate": "point"}, "R": {"protocol": "R_W3", "gate": "ci"}},
                    "original_tasks": orig},

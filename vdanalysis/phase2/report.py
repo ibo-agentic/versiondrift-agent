@@ -86,6 +86,12 @@ def build_report(cfg, res: dict[str, Any]) -> str:
                            "full_n_flagged", "full_detection_rate", "full_false_alarm_rate"]))
     lines.append(_section("New flips not seen in Phase 1", t.get("new_flips", []),
                           ["factor", "pair", "suite", "d_label", "factor_label", "confounding"]))
+    lines.append(_section("Cluster bootstrap for suites with repeated prompts (descriptive; the gate is unchanged)",
+                          t.get("cluster_bootstrap_summary", []),
+                          ["source", "protocol", "n_decisions", "n_clusters_min", "n_clusters_max", "n_label_changes",
+                           "median_ci_width_ratio"],
+                          "Tasks that share a baseline prompt form one cluster; label_changes = the CI label differs "
+                          "between the task-level and the cluster bootstrap. Per-decision rows: cluster_bootstrap.csv."))
     if "human_agreement" in t:
         lines.append(_section("Human labels (W6)", t["human_agreement"], ["rater_a", "rater_b", "kind", "n", "percent_agree", "kappa"]))
     return "\n".join(lines)

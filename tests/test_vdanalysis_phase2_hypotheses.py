@@ -99,3 +99,13 @@ def test_p7_needs_w3_and_compares_original_with_full_task_set(world):
     assert rows[("D", "s1")]["share"] == 0.25 and "a_old->a_new:neutral->harmful" in rows[("D", "s1")]["differing"]
     assert rows[("R", "s1")]["n_differ"] == 0
     assert rows[("D", "all")]["n_differ"] == 2
+
+
+def test_p7_only_covers_the_suites_w3_extends(world):
+    cfg, _, an, _ = world
+    cfg2 = type(cfg)({**cfg.raw, "phase2": {**cfg.p2, "w3": {**cfg.p2["w3"], "suites": ["s1"]}}}, base_dir=cfg.base_dir)
+    an2 = Phase2Analysis(cfg2, an.store)
+    ids = {"s1": {f"t{i:03d}" for i in range(N_TASKS)}}
+    rows = p7_rows(an2, ids)
+    assert {(r["protocol"], r["suite"]) for r in rows} == {("D", "s1"), ("D", "all"), ("R", "s1"), ("R", "all")}
+    assert [r for r in rows if r["protocol"] == "D" and r["suite"] == "all"][0]["n_decisions"] == 4
