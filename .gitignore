@@ -16,3 +16,11 @@ analysis_out/
 rescored/
 analysis_out_v3/
 rescored_v3/
+# Phase 2 results live in results_v3/ (backed up to OneDrive like results_v2/); the W0 scripts and reports are code, tracked
+results_v3/*
+!results_v3/W0_determinism/
+results_v3/W0_determinism/*
+!results_v3/W0_determinism/*.py
+!results_v3/W0_determinism/*.md
+!results_v3/W0_determinism/*.sh
+osf_deposit/
