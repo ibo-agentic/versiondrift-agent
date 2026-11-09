@@ -1,0 +1,3 @@
+protocol,n_decisions,agree_with_point_gate,agree_with_ci_gate,agree_with_class4_neutral_and_inconclusive_merged,share_harmful,share_beneficial
+D,30,0.900000,0.900000,0.900000,0.133333,0.166667
+R,30,0.966667,0.966667,0.966667,0.066667,0.200000

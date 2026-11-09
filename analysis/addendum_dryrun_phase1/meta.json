@@ -1,0 +1,15 @@
+{
+ "mode": "phase1",
+ "reps": 10000,
+ "seed": 1234,
+ "reruns": [
+  [
+   "R",
+   "R_AA"
+  ]
+ ],
+ "seconds": 513.0,
+ "sections": "s1,s3,s4,s5,s6,s7,s8",
+ "s9": "not implemented (open questions)",
+ "notes": "DRY RUN in Phase 1 mode on results_v2 only; rerun arm = R vs R_AA (Phase 1 A/A: different run seed, 3 trials, only qwen2->qwen25 has both models in R_AA); factor flips are vs D, so S1 numbers exercise the code and are NOT a valid noise floor"
+}

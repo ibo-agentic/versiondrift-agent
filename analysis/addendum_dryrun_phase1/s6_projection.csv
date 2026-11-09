@@ -1,0 +1,21 @@
+group,between_estimate,scenario,n_trials,n_units,sd_of_unit_mean,mde_80,power_at_delta
+synthetic,B_between_from_all_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.230314,0.064525,0.583567
+synthetic,B_between_from_all_trials,"10 trials, 100 tasks",10,100,0.221871,0.062159,0.615479
+synthetic,B_between_from_sampled_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.217936,0.061057,0.630930
+synthetic,B_between_from_sampled_trials,"10 trials, 100 tasks",10,100,0.208993,0.058551,0.667303
+synthetic clusters,B_between_from_all_trials,"Phase 1 layout (3 trials), 54 clusters",3,54,0.199568,0.076085,0.452761
+synthetic clusters,B_between_from_all_trials,"10 trials, 54 clusters",10,54,0.193992,0.073959,0.473765
+synthetic clusters,B_between_from_sampled_trials,"Phase 1 layout (3 trials), 54 clusters",3,54,0.191264,0.072919,0.484523
+synthetic clusters,B_between_from_sampled_trials,"10 trials, 54 clusters",10,54,0.185439,0.070698,0.508581
+bfcl_simple,B_between_from_all_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.268798,0.075306,0.460305
+bfcl_simple,B_between_from_all_trials,"10 trials, 100 tasks",10,100,0.258837,0.072515,0.488782
+bfcl_simple,B_between_from_all_trials,"10 trials, W3 task count 191",10,191,0.258837,0.052470,0.761063
+bfcl_simple,B_between_from_sampled_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.254901,0.071413,0.500675
+bfcl_simple,B_between_from_sampled_trials,"10 trials, 100 tasks",10,100,0.244374,0.068463,0.534330
+bfcl_simple,B_between_from_sampled_trials,"10 trials, W3 task count 191",10,191,0.244374,0.049538,0.807229
+bfcl_multiple,B_between_from_all_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.269804,0.075588,0.457554
+bfcl_multiple,B_between_from_all_trials,"10 trials, 100 tasks",10,100,0.260549,0.072995,0.483725
+bfcl_multiple,B_between_from_all_trials,"10 trials, W3 task count 109",10,109,0.260549,0.069917,0.517408
+bfcl_multiple,B_between_from_sampled_trials,"Phase 1 layout (3 trials), 100 tasks",3,100,0.257135,0.072039,0.493878
+bfcl_multiple,B_between_from_sampled_trials,"10 trials, 100 tasks",10,100,0.247406,0.069313,0.524356
+bfcl_multiple,B_between_from_sampled_trials,"10 trials, W3 task count 109",10,109,0.247406,0.066390,0.559636

@@ -1,0 +1,3 @@
+arm,subset,n_decisions,n_flips,sign_reversal,boundary_crossing
+R vs R_AA,all,3,0,0,0
+R vs R_AA,excluding_pair,3,0,0,0

@@ -435,6 +435,29 @@ def test_orchestrator_runs_queue_backs_up_and_stops_at_the_gpu_deadline(stub_wor
     assert launched == []
 
 
+def _split_result(parsed=99.67, score=100.0, raw=99.33, n_matched=300, prompt=100.0):
+    """Shape of results_v3/W0_determinism/split_test/R_result.json. all_identical is False whenever raw < 100."""
+    return {"n_a": 300, "n_b": 300, "n_matched": n_matched, "all_identical": False,
+            "groups": {"all": {"n": 300, "pct_prompt_identical": prompt, "pct_raw_identical": raw,
+                               "pct_parsed_identical": parsed, "pct_score_identical": score}}}
+
+
+def test_w3_gate_does_not_wait_for_w1_kaggle(stub_world):
+    from scripts.phase2 import run_laptop
+    assert "W1_kaggle" not in run_laptop.PREREQ_FOR_W3
+    assert set(run_laptop.PREREQ_FOR_W3) == {"W1_laptop", "W2_R", "W2_D", "W2b"}
+
+
+def test_determinism_condition():
+    from scripts.phase2.run_laptop import determinism_ok
+    assert determinism_ok(_split_result())                       # parsed 99.67% and raw 99.33% differences are allowed
+    assert determinism_ok(_split_result(parsed=100.0, raw=100.0))
+    assert not determinism_ok(_split_result(prompt=99.67))
+    assert not determinism_ok(_split_result(score=99.67))
+    assert not determinism_ok(_split_result(n_matched=299))
+    assert not determinism_ok({"all_identical": True})                              # the old flag alone is not read
+
+
 def test_w3_gate(stub_world, tmp_path):
     from scripts.phase2 import run_laptop
     root, mdir, spec = stub_world
@@ -452,9 +475,15 @@ def test_w3_gate(stub_world, tmp_path):
     assert not ok and "split-equivalence" in why
     chk = root / run_laptop.SPLIT_CHECK_R
     chk.parent.mkdir(parents=True, exist_ok=True)
-    chk.write_text(json.dumps({"all_identical": False}), encoding="utf-8")
+    chk.write_text(json.dumps(_split_result()), encoding="utf-8")                  # all_identical False, raw 99.3%
+    assert run_laptop.w3_gate(date(2026, 11, 1), mdir, root) == (True, "ok")         # raw 99.3% does not block
+    chk.write_text(json.dumps(_split_result(prompt=99.0)), encoding="utf-8")
     assert not run_laptop.w3_gate(date(2026, 11, 1), mdir, root)[0]
-    chk.write_text(json.dumps({"all_identical": True}), encoding="utf-8")
+    chk.write_text(json.dumps(_split_result(score=99.0)), encoding="utf-8")
+    assert not run_laptop.w3_gate(date(2026, 11, 1), mdir, root)[0]
+    chk.write_text(json.dumps(_split_result(n_matched=299)), encoding="utf-8")
+    assert not run_laptop.w3_gate(date(2026, 11, 1), mdir, root)[0]
+    chk.write_text(json.dumps(_split_result()), encoding="utf-8")
     assert run_laptop.w3_gate(date(2026, 11, 1), mdir, root) == (True, "ok")
     w3 = {"manifest": "W3", "runs": [dict(spec["W1_laptop"][0], data="data/phase2/missing.jsonl")]}
     (mdir / "W3.json").write_text(json.dumps(w3), encoding="utf-8")

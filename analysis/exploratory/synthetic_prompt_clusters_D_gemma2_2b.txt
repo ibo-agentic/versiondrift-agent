@@ -1,0 +1,4 @@
+tasks 100 distinct baseline prompts 54
+baseline         tasks=100 distinct_hashes=54 tasks_with_>1_hash=0 own_groups(by hash-set)=54 baseline_groups=54 baseline_groups_with_identical_cond_prompts=54
+fault_reporting  tasks=100 distinct_hashes=88 tasks_with_>1_hash=0 own_groups(by hash-set)=88 baseline_groups=54 baseline_groups_with_identical_cond_prompts=32
+schema_drift     tasks=100 distinct_hashes=71 tasks_with_>1_hash=0 own_groups(by hash-set)=71 baseline_groups=54 baseline_groups_with_identical_cond_prompts=37

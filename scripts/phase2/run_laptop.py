@@ -32,7 +32,8 @@ from scripts.phase2.run_one import is_done  # noqa: E402
 BACKUP_DIR = Path(r"C:\Users\Ibo\OneDrive\upgradecanary_backups")
 LOG_NAME = "phase2_laptop_progress.log"
 SPLIT_CHECK_R = Path("results_v3/W0_determinism/split_test/R_result.json")
-PREREQ_FOR_W3 = ["W1_laptop", "W1_kaggle", "W2_R", "W2_D", "W2b"]
+# DEVIATIONS.md 2026-11-08 (h): W3 runs on the laptop and does not wait for W1_kaggle.
+PREREQ_FOR_W3 = ["W1_laptop", "W2_R", "W2_D", "W2b"]
 
 
 def log(root: Path, msg: str) -> None:
@@ -48,9 +49,23 @@ def manifests_for_queue(names: list[str], directory: Path = MANIFEST_DIR) -> dic
     return {n: load_manifest(n, directory) for n in names}
 
 
+def determinism_ok(result: dict) -> bool:
+    """DEVIATIONS.md 2026-11-08 (a), as revised 2026-11-09: met when prompts and strict scores are 100% identical
+    over all matched records. Parsed-call and raw-output differences are allowed. The raw ``all_identical`` flag is
+    not read."""
+    try:
+        allg = result["groups"]["all"]
+        n = int(allg["n"])
+        return (n > 0 and int(result["n_a"]) == int(result["n_b"]) == int(result["n_matched"]) == n
+                and float(allg["pct_prompt_identical"]) == 100.0 and float(allg["pct_score_identical"]) == 100.0)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def w3_gate(today: date, manifests_dir: Path = MANIFEST_DIR, root: Path = REPO_ROOT) -> tuple[bool, str]:
-    """W3 runs only if W1, W2 and W2b are complete by 20 Nov 2026 (a calendar condition, never a result
-    condition), the R split-equivalence check has passed, and the added-task files exist."""
+    """W3 runs only if W1_laptop, W2 (R and D) and W2b are complete by 20 Nov 2026 (a calendar and hardware
+    condition, never a result condition; W1_kaggle is not awaited, DEVIATIONS.md 2026-11-08 (h)), the R split
+    check meets the determinism condition (DEVIATIONS.md 2026-11-08 (a)), and the added-task files exist."""
     if today > date.fromisoformat(W3_DEADLINE):
         return False, f"after {W3_DEADLINE}: W3 is skipped and reported as not run"
     for name in PREREQ_FOR_W3:
@@ -60,7 +75,7 @@ def w3_gate(today: date, manifests_dir: Path = MANIFEST_DIR, root: Path = REPO_R
             return False, f"{name} not complete ({len(todo)} runs left, e.g. {todo[0]})"
     chk = root / SPLIT_CHECK_R
     try:
-        ok = bool(json.loads(chk.read_text(encoding="utf-8")).get("all_identical"))
+        ok = determinism_ok(json.loads(chk.read_text(encoding="utf-8")))
     except Exception:
         ok = False
     if not ok:

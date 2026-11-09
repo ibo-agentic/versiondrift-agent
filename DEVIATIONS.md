@@ -890,3 +890,88 @@ protocol D, to keep the proof itself cheap), ran them once as a single
 `raw_outputs.jsonl` (excluding the `run_id` field, which legitimately
 differs between the two invocations' timestamps) — confirmed by direct
 comparison, not assumed from the seeding argument alone.
+
+
+## 2026-11-08 — Decisions on the analysis addendum and the W3 gate (all decided before any Phase 2 analysis)
+
+Context: the laptop queue is finished and the addendum (tag plan-v2.1) is committed. No Phase 2 result data has been
+opened or analysed; the addendum code was dry-run on Phase 1 data (results_v2) only. Each entry below was decided before
+any Phase 2 analysis.
+
+### 2026-11-08 (a) — R split test: what the W3 determinism condition means
+
+**Decided before any Phase 2 analysis.** PLAN_PHASE2.md section W3 requires the split-equivalence check to be repeated
+for R on the laptop. The R test (results_v3/W0_determinism/split_test/R_result.json) gave: prompts and strict
+scores 100% identical on all 300 records; parsed calls 99.67% and raw output 99.33% identical (2 of 300 records differ:
+task-001 and task-009, the same two records as in the D test; task-001 differs in the parsed answer, 21 vs 20.5,
+task-009 only by trailing whitespace in the raw text). `all_identical` is therefore False.
+(Correction made 2026-11-08, before any Phase 2 analysis: an earlier version of this entry said parsed calls were 100%
+identical; the result file says 99.67%.)
+**Decision (revised 2026-11-09):** the W3 determinism condition is met when strict scores are 100% identical over all
+matched records (prompts identical as well). Parsed-call and raw-output differences are allowed, the same reading
+PLAN_PHASE2 section 2 accepted for D. `w3_gate` is to read that condition
+instead of `all_identical`, with a test.
+**Status:** implemented as `determinism_ok` in scripts/phase2/run_laptop.py (prompts and strict scores 100% identical over
+all matched records; test_determinism_condition). The existing R result meets it (prompts 100%, strict scores 100%).
+**This wording was revised on 2026-11-09, after the R split result was seen, to match the standard PLAN_PHASE2 §2 already accepted for D (100% strict scores). The split test is a pipeline-equivalence check, not a study outcome, and no Phase 2 hypothesis result had been seen.**
+The original wording of 2026-11-08 (parsed calls and strict scores both 100%) would not have been met by the existing R
+result (parsed 99.67%). No threshold, hypothesis, gate rule or control definition of the studies changes: this is the
+pre-flight check of the W3 run, and only its pass condition is made explicit.
+
+### 2026-11-08 (b) — S1/S2 under the S3 four-class gate use observed labels only
+
+**Decided before any Phase 2 analysis.** The four-class gate (S3) is applied to the observed decision, not inside the
+hierarchical bootstrap of S1/S2. S1 and S2 flips counted under the four classes use the observed class of each
+decision (point estimate and 90% interval from the full sample). No hierarchical interval is computed per replicate.
+Reason: a per-replicate interval needs a bootstrap inside each of the 10,000 replicates.
+
+### 2026-11-08 (c) — S1.4 per-decision flip probability p_i
+
+**Decided before any Phase 2 analysis.** p_i for decision i is the share of task resamples (hierarchical bootstrap
+replicates, task level) in which the two arms' labels differ. These p_i feed "expected >= 1 noise flip =
+mean(1 - (1 - p_i)^k_i)".
+
+### 2026-11-08 (d) — F5 noise baseline is a proxy
+
+**Decided before any Phase 2 analysis.** F5 is run on Kaggle hardware and compared with Kaggle D. The rerun arm for the
+noise floor is the laptop D vs D_AA2 (same run, different seeds). It is used as a proxy for Kaggle rerun noise.
+This is reported as a limitation wherever an F5 excess flip rate is given.
+
+### 2026-11-08 (e) — S3 harmful/beneficial and the 90% equivalence interval
+
+**Decided before any Phase 2 analysis.** In the four-class gate, harmful and beneficial come from the existing
+pre-registered CI-gate label (label_ci). The neutral class uses a 90% equivalence interval from a new task-clustered
+bootstrap of the stress diff: B = 10,000 resamples, seed 1234, percentile interval (5th and 95th percentile). Neutral if
+that interval lies inside +/-0.05; otherwise inconclusive. The primary gate is unchanged.
+
+### 2026-11-08 (f) — S9 specification
+
+**Decided before any Phase 2 analysis.** statsmodels is added to requirements.txt, pinned (statsmodels==0.15.0; it
+brings scipy, pandas and patsy). For each suite and each generation-side protocol P in {R, F1, F3, F4, F5, F6} that
+covers all 10 pairs, fit separately (module vdanalysis/phase2/addendum/s9_hierarchical.py):
+- data: stress-condition records of D and P, pair-stacked (a model in two pairs appears in both, new = 0 in one and
+  new = 1 in the other);
+- outcome: binary strict score;
+- fixed effects: new (0/1) x protocol (D = reference) + condition;
+- random effects: crossed intercepts (1 | task) + (1 | pair);
+- fit: statsmodels BinomialBayesMixedGLM, fit_vb, seed 1234;
+- report: posterior mean and SD of the new x protocol coefficient (log-odds), and whether its sign agrees with S1's
+  direction. Descriptive only; no gate, label or hypothesis uses it.
+Interpretation fixed here (S1 reports unsigned flips): "S1's direction" = the sign of the mean, over the suite's
+decisions, of (stress diff under P - stress diff under D). The VB convergence flag is reported with each fit.
+
+### 2026-11-08 (g) — Kaggle upload order
+
+**Decided before any Phase 2 analysis.** Batches are unchanged (K01-K10 as in configs/phase2/W1_kaggle.json). All batches are
+mutually independent (checked), so the order is free. Upload and run order: K02, K03, K07, K05, K09, K06, K01, K10,
+K08, K04. Reason: it finishes the same-hardware D_KAGGLE/R_KAGGLE baselines and their matching F5 runs earliest. This
+changes no run, seed or setting.
+
+### 2026-11-08 (h) — W3 gate amended: W3 runs on the laptop and no longer waits for W1_kaggle
+
+**Decided before any Phase 2 analysis.** W3 gate amended: W3 runs on the laptop and no longer waits for W1_kaggle. Reason: the plan's priority order only matters when workstreams compete for the same hardware. All remaining higher-priority work is on Kaggle (W1_kaggle) or needs no GPU (W4, W5, W6), and the laptop GPU is idle. The other conditions stay: W1_laptop, W2 (R and D) and W2b complete, determinism condition per entry (a), added-task files present. The condition still depends only on calendar and hardware, never on results. W1_kaggle keeps top priority on Kaggle; Kaggle runs not done by 2026-12-10 are reported as not run.
+Implemented: `PREREQ_FOR_W3` in scripts/phase2/run_laptop.py no longer lists W1_kaggle (test: test_w3_gate_does_not_wait_for_w1_kaggle).
+
+### 2026-11-08 (i) — Descriptive sensitivity row: S3 four-class verdict on synthetic with the baseline-prompt-group cluster bootstrap
+
+**Decided before any Phase 2 analysis.** For synthetic decisions only, S3 is repeated with tasks that share a baseline prompt forming one resampling cluster (the plan's cluster bootstrap, PLAN_PHASE2 analysis list). Harmful/beneficial = the pre-registered CI-gate rule applied to the 95% cluster interval; neutral = 90% cluster interval inside +/-0.05; else inconclusive. B = 10,000, seed 1234. Output `s3_cluster_synthetic*.csv`. Descriptive only; the gate and the main S3 table are unchanged.

@@ -1,0 +1,4 @@
+suite,n_pairs,pooled_sd_task_diff,mde_80_pooled,mde_min_pair,mde_max_pair
+synthetic,10,0.2314,0.0648,0.0326,0.0849
+bfcl_simple,10,0.27,0.0756,0.0323,0.107
+bfcl_multiple,10,0.271,0.0759,0.037,0.0971

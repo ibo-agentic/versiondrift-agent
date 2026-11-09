@@ -1,0 +1,4 @@
+suite,protocol,reason
+synthetic,F4,protocol not in config
+bfcl_simple,F4,protocol not in config
+bfcl_multiple,F4,protocol not in config

@@ -1,0 +1,9 @@
+{
+ "mode": "phase1",
+ "reps": 10000,
+ "seed": 1234,
+ "reruns": [],
+ "seconds": 425.7,
+ "sections": "s3",
+ "notes": "S3 cluster sensitivity dry run, Phase 1 mode, results_v2 only"
+}

@@ -1,0 +1,5 @@
+suite,unit,n_units_pooled_rows,n_units,n_trials,n_sampled_trials,V_observed,sigma2_sampling,B_between_from_all_trials,B_between_from_sampled_trials,greedy_trials
+synthetic,task,1000,1000,3,2,0.053045,0.028875,0.046628,0.041079,1
+synthetic (clusters = tasks sharing a baseline prompt),cluster,540,540,3,2,0.039827,0.016596,0.036139,0.032894,1
+bfcl_simple,task,1000,1000,3,2,0.072253,0.039750,0.063419,0.056141,1
+bfcl_multiple,task,1000,1000,3,2,0.072794,0.037125,0.064544,0.057869,1

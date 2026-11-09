@@ -1,0 +1,13 @@
+protocol,n_compared,n_agree,share,disagree
+D,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F1,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F3,3,0,0.000000,phi35_mini->phi4_mini/synthetic:harmful!=neutral;phi35_mini->phi4_mini/bfcl_simple:harmful!=beneficial;phi35_mini->phi4_mini/bfcl_multiple:harmful!=beneficial
+F4_json,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F6,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F7,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F8,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+F10,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+R,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+R_F3,9,5,0.555556,phi35_mini->phi4_mini/synthetic:beneficial!=neutral;phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;phi35_mini->phi4_mini/bfcl_multiple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful
+R_F5,9,9,1.000000,
+R_F6,9,7,0.777778,phi35_mini->phi4_mini/bfcl_simple:neutral!=beneficial;gemma2_2b->gemma3_4b/synthetic:neutral!=harmful

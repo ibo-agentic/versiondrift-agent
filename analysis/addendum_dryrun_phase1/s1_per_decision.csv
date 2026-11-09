@@ -1,0 +1,4 @@
+decision,p_rerun_flip,k_generation_factors,p_at_least_one_noise_flip
+qwen2->qwen25/synthetic,0.000000,5,0.000000
+qwen2->qwen25/bfcl_simple,0.032400,5,0.151837
+qwen2->qwen25/bfcl_multiple,0.161300,5,0.585014
