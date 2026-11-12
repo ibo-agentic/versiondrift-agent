@@ -25,3 +25,7 @@ results_v3/W0_determinism/*
 !results_v3/W0_determinism/*.sh
 osf_deposit/
 kaggle_upload/
+
+# Local project rules (not published)
+CLAUDE.md
+kaggle_download/
