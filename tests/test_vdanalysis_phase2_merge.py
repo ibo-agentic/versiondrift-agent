@@ -140,3 +140,28 @@ def test_views(tmp_path):
     with pytest.raises(ValueError):
         run.view("bogus")
     assert set(g.prompts) <= set(run.prompts)
+
+
+def test_audit_only_blocks_phase1_part(tmp_path):
+    from tests.fake_phase2 import build_phase2_world
+    from vdanalysis.phase2.config import Phase2Config
+    from vdanalysis.phase2.merge import MergedStore
+    raw, _ = build_phase2_world(tmp_path)
+    raw["audit_only_folders"] = ["F1/a_new"]
+    store = MergedStore(Phase2Config(raw, tmp_path))
+    for root in ("results_root", "rescored_root"):
+        with pytest.raises(ValueError, match="audit-only"):
+            store._part_dir("F1", "a_new", "s1", PartSpec(root=root))
+    store._part_dir("F1", "a_new", "s1", PartSpec(root="results_root", folder="F1_rerun"))   # a different folder is fine
+    store._part_dir("F1", "b_new", "s1", PartSpec(root="results_root"))                      # another model is fine
+
+
+def test_audit_only_does_not_block_phase2_part(tmp_path):
+    from tests.fake_phase2 import build_phase2_world
+    from vdanalysis.phase2.config import Phase2Config
+    from vdanalysis.phase2.merge import MergedStore
+    raw, _ = build_phase2_world(tmp_path)
+    raw["audit_only_folders"] = ["F1/a_new"]
+    store = MergedStore(Phase2Config(raw, tmp_path))
+    d = store._part_dir("F1", "a_new", "s1", PartSpec(root="v3", trial_offset=3, overrides=False))
+    assert d.parts[-3:] == ("F1", "a_new", "s1") and "results_v3" in d.parts

@@ -33,6 +33,9 @@ from ..loader import MissingRun, Run, Store, failure_bucket, record_key, record_
 from .config import PartSpec, Phase2Config
 
 
+PHASE1_ROOTS = ("results_root", "rescored_root")
+
+
 class MergeError(ValueError):
     """Parts that cannot be merged safely."""
 
@@ -210,7 +213,9 @@ class MergedStore(Store):
         else:
             folder = spec.folder or self.cfg.protocols[protocol].get("folder", protocol)
         rel = f"{folder}/{model}".strip("/")
-        if rel in self.cfg.audit_only or f"{rel}/{suite}" in self.cfg.audit_only:
+        # The audit-only list names pre-fix Phase 1 runs, so it binds only parts read from the Phase 1 roots;
+        # the same folder/model under a Phase 2 root (results_v3) is new, post-fix data (DEVIATIONS.md, 2026-11-14).
+        if spec.root in PHASE1_ROOTS and (rel in self.cfg.audit_only or f"{rel}/{suite}" in self.cfg.audit_only):
             raise ValueError(f"{rel} is audit-only and must not be used in analysis")
         return self.cfg.root_path(spec.root) / folder / model / suite
 

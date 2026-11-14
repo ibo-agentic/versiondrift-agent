@@ -975,3 +975,13 @@ Implemented: `PREREQ_FOR_W3` in scripts/phase2/run_laptop.py no longer lists W1_
 ### 2026-11-08 (i) — Descriptive sensitivity row: S3 four-class verdict on synthetic with the baseline-prompt-group cluster bootstrap
 
 **Decided before any Phase 2 analysis.** For synthetic decisions only, S3 is repeated with tasks that share a baseline prompt forming one resampling cluster (the plan's cluster bootstrap, PLAN_PHASE2 analysis list). Harmful/beneficial = the pre-registered CI-gate rule applied to the 95% cluster interval; neutral = 90% cluster interval inside +/-0.05; else inconclusive. B = 10,000, seed 1234. Output `s3_cluster_synthetic*.csv`. Descriptive only; the gate and the main S3 table are unchanged.
+
+### 2026-11-14 (j) — Analysis code bug: audit-only ban on F3/granite30 also blocked the Phase 2 run
+
+Analysis code bug found when running the Phase 2 analysis (step 4 crashed before producing any output; no Phase 2 results were seen). The audit-only ban on F3/granite30 was meant for the pre-fix Phase 1 run in results_v2 but matched by folder+model name only, so it also blocked the post-fix Phase 2 run in results_v3. Fix: the ban now applies only to parts read from the Phase 1 root. No change to data, scoring, or planned analyses.
+
+Safety check before the change (metadata only, no score data opened): the three `results_v3/F3/granite30` runs were created 2026-10-25 (run ids ...20261025T...Z). The Granite-3.0 parser fix is commit 14fefe5 (2026-10-07, an ancestor of the analysis commit), and `upgradecanary/parsing.py` has no later commit, so the code that generated these runs contained the fix. The run manifests record no git commit, so this rests on dates and file history, not on a recorded hash.
+
+Implemented: `PHASE1_ROOTS` and the scoped check in `vdanalysis/phase2/merge.py` (`MergedStore._part_dir`); tests test_audit_only_blocks_phase1_part and test_audit_only_does_not_block_phase2_part in tests/test_vdanalysis_phase2_merge.py. The Phase 1 loader (`vdanalysis/loader.py`) is unchanged.
+
+pytest config now ignores the extracted Kaggle copies; test-collection hygiene only.
