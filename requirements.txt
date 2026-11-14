@@ -5,3 +5,5 @@ llama-cpp-python>=0.2.90
 pytest>=8.0
 # S9 (addendum): hierarchical Bayesian logistic model. Pulled in scipy, pandas and patsy as dependencies.
 statsmodels==0.15.0
+# Only for the exploratory figure analysis/exploratory/EXPLORATORY_flip_vs_threshold.png (not needed for the analysis itself).
+matplotlib==3.11.2

@@ -407,3 +407,19 @@ def test_driver_s1_end_to_end_with_a_silent_rerun_arm(tmp_path_factory):
     assert res["s1_factors_excl_qwen25_qwen3"] and res["s2_factor_flips"] and res["s3_factor_flips"]
     assert (out / "s1_factors.csv").exists() and (out / "s1_per_decision.csv").exists()
     assert res["s1_headline"][0]["n_decisions_with_rerun"] > 0
+
+
+def test_s1_excluding_a_pair_reports_point_estimates_on_the_reduced_data():
+    """DEVIATIONS.md (m): the excluding-pair table used the full-data f_F / r next to a bootstrap without the pair."""
+    inp = _inp(rerun_same=True)
+    for f, cells in inp.factor_cells.items():
+        inp.factor_cells[f] = cells[:]
+    # make the first pair behave differently: its factor arm equals the baseline (no factor flip), all others flip
+    p0 = inp.pairs[0]
+    inp.arrays[(p0, "s1", "F1")] = inp.arrays[(p0, "s1", "D")]
+    full = summarize(inp, hier_bootstrap(inp, reps=200, seed=3))[0]
+    red = summarize(inp, hier_bootstrap(inp, reps=200, seed=3, exclude_pairs=(p0,)))[0]
+    assert (full["n_decisions"], full["k_factor_flips"], full["f_F"]) == (4, 3, 0.75)
+    assert (red["n_decisions"], red["k_factor_flips"], red["f_F"]) == (3, 3, 1.0)       # not 4 / 3 / 0.75
+    assert red["e_F"] == 1.0 and red["e_F_ci95_lo"] <= red["e_F"] <= red["e_F_ci95_hi"]
+    assert observed(inp, [p for p in inp.pairs if p != p0])["factors"]["F1"]["n"] == 3

@@ -50,20 +50,22 @@ def holm(pvals: dict[str, float]) -> dict[str, float]:
     return out
 
 
-def observed(inp: S1Input) -> dict:
-    """Point estimates on the observed labels (no resampling)."""
+def observed(inp: S1Input, pairs: list[str] | None = None) -> dict:
+    """Point estimates on the observed labels (no resampling). ``pairs`` limits them to those upgrade pairs
+    (default: all), so that a bootstrap that leaves a pair out is reported next to point estimates that leave it out too."""
+    keep = set(inp.pairs if pairs is None else pairs)
     one = {}
 
     def lab(pair, suite, proto):
         a = inp.arrays[(pair, suite, proto)]
         return int(point_code(np.array([a.diff()]), inp.delta)[0])
 
-    rerun_cells = [(p, s) for p in inp.pairs for s in inp.suites if inp.has_rerun(p, s)]
+    rerun_cells = [(p, s) for p in inp.pairs if p in keep for s in inp.suites if inp.has_rerun(p, s)]
     rerun_flip = {(p, s): lab(p, s, inp.rerun[0]) != lab(p, s, inp.rerun[1]) for p, s in rerun_cells}
     one["rerun"] = {"n": len(rerun_cells), "k": sum(rerun_flip.values()), "cells": rerun_flip}
     fac = {}
     for f in inp.factor_cells:
-        cells = inp.usable_cells(f)
+        cells = [c for c in inp.usable_cells(f) if c[0] in keep]
         fl = [lab(p, s, fp) != lab(p, s, bp) for p, s, fp, bp in cells]
         rr = [rerun_flip[(p, s)] for p, s, _, _ in cells]
         fac[f] = {"n": len(cells), "k_factor": sum(fl), "k_rerun": sum(rr)}
@@ -133,7 +135,7 @@ def pct_ci(x: np.ndarray, level: float = 0.95) -> tuple[float, float]:
 
 def summarize(inp: S1Input, boot: dict) -> list[dict]:
     """One row per generation factor: f, r, e, bootstrap CI of e, one-sided p (e > 0), Holm-adjusted p."""
-    obs = observed(inp)
+    obs = observed(inp, boot.get("pairs"))                      # the pairs the bootstrap actually resampled
     rows, pvals = [], {}
     for f, ob in obs["factors"].items():
         e_rep = boot["factors"][f]["e"]
