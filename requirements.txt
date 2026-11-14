@@ -7,3 +7,5 @@ pytest>=8.0
 statsmodels==0.15.0
 # Only for the exploratory figure analysis/exploratory/EXPLORATORY_flip_vs_threshold.png (not needed for the analysis itself).
 matplotlib==3.11.2
+# W6 human labeling: writing and reading the labeling spreadsheets (scripts/phase2/w6_build.py, w6_merge.py).
+openpyxl==3.1.5
