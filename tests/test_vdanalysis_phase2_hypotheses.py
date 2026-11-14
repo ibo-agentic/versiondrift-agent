@@ -109,3 +109,19 @@ def test_p7_only_covers_the_suites_w3_extends(world):
     rows = p7_rows(an2, ids)
     assert {(r["protocol"], r["suite"]) for r in rows} == {("D", "s1"), ("D", "all"), ("R", "s1"), ("R", "all")}
     assert [r for r in rows if r["protocol"] == "D" and r["suite"] == "all"][0]["n_decisions"] == 4
+
+
+def test_p7_ignores_suites_that_w3_does_not_have(tmp_path):
+    """W3 never includes some suite (synthetic in the real study): P7 must still be computed on the W3 suites."""
+    import shutil
+    from tests.fake_phase2 import build_phase2_world
+    raw, paths = build_phase2_world(tmp_path)
+    for proto in ("W3_D", "W3_R"):
+        for d in (paths["v3"] / proto).iterdir():
+            shutil.rmtree(d / "s2")
+    cfg = Phase2Config({**raw, "phase2": {**raw["phase2"], "w3": {**raw["phase2"]["w3"], "suites": ["s1"]}}}, base_dir=tmp_path)
+    an = Phase2Analysis(cfg)
+    ids = {"s1": {f"t{i:03d}" for i in range(N_TASKS)}}
+    rows = {(r["protocol"], r["suite"]): r for r in p7_rows(an, ids)}
+    assert set(rows) == {("D", "s1"), ("D", "all"), ("R", "s1"), ("R", "all")}
+    assert rows[("D", "s1")]["n_decisions"] == 4 and rows[("D", "s1")]["n_differ"] == 1

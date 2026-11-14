@@ -191,6 +191,20 @@ def p5_row(cfg, ctl_rows: list[dict], view: str = "all") -> dict[str, Any]:
 
 
 # ---- P7 -------------------------------------------------------------------------
+def _rows_for_suites(an: Phase2Analysis, protocol: str, suites: list[str]) -> dict[tuple, dict[str, Any]]:
+    """Like ``an.rows(protocol)`` but only for ``suites``: P7 must not look up suites W3 does not extend
+    (DEVIATIONS.md, 2026-11-14, entry k)."""
+    out: dict[tuple, dict[str, Any]] = {}
+    for pair in an.cfg.pairs:
+        if not an.protocol_applies_to_pair(protocol, pair):
+            continue
+        for suite in suites:
+            row = an._row(protocol, pair, suite)
+            if row is not None:
+                out[(row["pair"], suite)] = row
+    return out
+
+
 def p7_rows(an: Phase2Analysis, task_ids_by_suite: dict[str, set[str]]) -> list[dict[str, Any]]:
     """Per protocol (D with the point gate, R with the CI gate) and suite: the
     share of decisions whose verdict on the original tasks differs from the
@@ -201,13 +215,14 @@ def p7_rows(an: Phase2Analysis, task_ids_by_suite: dict[str, set[str]]) -> list[
     for proto_name, spec in (w3.get("protocols") or {}).items():
         proto, gate = spec["protocol"], spec.get("gate", "point")
         key = "label_ci" if gate == "ci" else "label_point"
-        full = an.rows(proto)
+        suites = list(w3.get("suites") or an.cfg.suites)
+        full = _rows_for_suites(an, proto, suites)
         orig_view = {}
         for suite, ids in task_ids_by_suite.items():
             sub = Phase2Analysis(an.cfg, an.store, an.with_ci, an.allow_missing, ViewSpec(tasks=frozenset(ids)))
-            orig_view[suite] = {k: r for k, r in sub.rows(proto).items() if k[1] == suite}
+            orig_view[suite] = _rows_for_suites(sub, proto, [suite]) if suite in suites else {}
         tot_n = tot_d = 0
-        for suite in (w3.get("suites") or an.cfg.suites):
+        for suite in suites:
             f_rows = {k: r for k, r in full.items() if k[1] == suite}
             o_rows = orig_view.get(suite, {})
             keys = sorted(set(f_rows) & set(o_rows))

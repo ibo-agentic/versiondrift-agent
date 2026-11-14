@@ -985,3 +985,9 @@ Safety check before the change (metadata only, no score data opened): the three 
 Implemented: `PHASE1_ROOTS` and the scoped check in `vdanalysis/phase2/merge.py` (`MergedStore._part_dir`); tests test_audit_only_blocks_phase1_part and test_audit_only_does_not_block_phase2_part in tests/test_vdanalysis_phase2_merge.py. The Phase 1 loader (`vdanalysis/loader.py`) is unchanged.
 
 pytest config now ignores the extracted Kaggle copies; test-collection hygiene only.
+
+### 2026-11-14 (k) — P7 was skipped by a bug; fix: P7 on w3.suites only
+
+P7 was skipped by a bug: p7_rows() looked up all config suites before applying w3.suites, and W3 never included synthetic (by plan). Fix: P7 is computed on w3.suites only (bfcl_simple, bfcl_multiple), as PLAN_PHASE2 specifies. The other tables are expected to be identical; this is verified by diff.
+
+Implemented: `_rows_for_suites()` and its use in `p7_rows()` (`vdanalysis/phase2/hypotheses2.py`); test test_p7_ignores_suites_that_w3_does_not_have in tests/test_vdanalysis_phase2_hypotheses.py (fails without the fix, passes with it). The first Phase 2 analysis run (tag pre-analysis-v2.1, commit 9654dbd, output in `analysis_out_v3/`) is kept unchanged; the rerun goes to `analysis_out_v3_p7/`.
