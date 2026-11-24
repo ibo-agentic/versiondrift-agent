@@ -1,0 +1,25 @@
+protocol,decisions,version,trials_per_call,calls,scored_decisions,wrong,serious,mild,inconclusive
+D,all 30 decisions,"1 trial, naive (previous section)",1,180,18,33,4,29,
+D,all 30 decisions,"3 trials pooled, naive",3,54,18,8,1,7,
+D,all 30 decisions,"5 trials pooled, naive",5,36,18,5,0,5,
+D,all 30 decisions,"10 trials pooled, naive (point gate on all trials)",10,18,18,2,0,2,
+D,all 30 decisions,3 trials + CI gate + 'inconclusive' allowed,3,54,18,3,1,2,7
+D,all 30 decisions,10 trials + CI gate + 'inconclusive' allowed (the calibrated method),10,18,18,0,0,0,2
+D,without qwen25->qwen3,"1 trial, naive (previous section)",1,150,15,32,4,28,
+D,without qwen25->qwen3,"3 trials pooled, naive",3,45,15,8,1,7,
+D,without qwen25->qwen3,"5 trials pooled, naive",5,30,15,5,0,5,
+D,without qwen25->qwen3,"10 trials pooled, naive (point gate on all trials)",10,15,15,2,0,2,
+D,without qwen25->qwen3,3 trials + CI gate + 'inconclusive' allowed,3,45,15,3,1,2,7
+D,without qwen25->qwen3,10 trials + CI gate + 'inconclusive' allowed (the calibrated method),10,15,15,0,0,0,2
+R,all 30 decisions,"1 trial, naive (previous section)",1,150,15,29,0,29,
+R,all 30 decisions,"3 trials pooled, naive",3,45,15,7,0,7,
+R,all 30 decisions,"5 trials pooled, naive",5,30,15,4,0,4,
+R,all 30 decisions,"10 trials pooled, naive (point gate on all trials)",10,15,15,2,0,2,
+R,all 30 decisions,3 trials + CI gate + 'inconclusive' allowed,3,45,15,3,0,3,6
+R,all 30 decisions,10 trials + CI gate + 'inconclusive' allowed (the calibrated method),10,15,15,1,0,1,1
+R,without qwen25->qwen3,"1 trial, naive (previous section)",1,130,13,18,0,18,
+R,without qwen25->qwen3,"3 trials pooled, naive",3,39,13,3,0,3,
+R,without qwen25->qwen3,"5 trials pooled, naive",5,26,13,2,0,2,
+R,without qwen25->qwen3,"10 trials pooled, naive (point gate on all trials)",10,13,13,1,0,1,
+R,without qwen25->qwen3,3 trials + CI gate + 'inconclusive' allowed,3,39,13,3,0,3,2
+R,without qwen25->qwen3,10 trials + CI gate + 'inconclusive' allowed (the calibrated method),10,13,13,1,0,1,0

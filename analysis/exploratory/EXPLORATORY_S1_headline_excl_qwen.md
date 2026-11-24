@@ -15,7 +15,7 @@ replacement, B = 10,000, seed 1234.
 
 | | Decisions | Observed share with >=1 generation flip | Expected noise share | Difference | 95% CI | P(diff <= 0) |
 |---|---|---|---|---|---|---|
-| All decisions | 30 | 50.0% (15/30) | 32.2% | +17.9 pts | +2.0 to +34.4 | 0.013 |
+| All decisions | 30 | 50.0% (15/30) | 32.2% | +17.8 pts | +2.0 to +34.4 | 0.013 |
 | Excluding qwen25->qwen3 | 27 | 44.4% (12/27) | 35.5% | +8.9 pts | -5.1 to +24.2 | 0.11 |
 
 The "All decisions" row reproduces the saved S1 headline (observed 0.5, expected 0.3215).

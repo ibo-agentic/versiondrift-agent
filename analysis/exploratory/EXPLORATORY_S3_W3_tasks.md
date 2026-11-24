@@ -2,7 +2,7 @@
 
 **Exploratory. Not pre-registered. Descriptive only; it feeds no gate, verdict or hypothesis.**
 Made 2026-11-14 from existing data only (no new runs), after the Phase 2 analysis had been seen.
-Code state: tag pre-analysis-v2.2, commit 8e68388. Script: not committed (run from the scratchpad).
+Code state: tag pre-analysis-v2.2, commit 8e68388. Script: `scripts/exploratory/s3_w3_tasks.py` (added later; rounding-safe gate comparisons).
 
 ## What was computed
 

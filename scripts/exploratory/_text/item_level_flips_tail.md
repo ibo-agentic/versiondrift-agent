@@ -1,0 +1,18 @@
+## Plain-language summary
+
+**Total score barely moves, but many individual questions change.** The clearest case is **mistral_v01 -> v02**: its mean stress diff is 0.000 under D, yet 138 of 600 questions (23%) change sides: 88 got worse and 50 got better. The same pattern is milder for **llama3 -> llama31** (mean -0.019; 55 worse, 37 better; 15% churn), **phi3_mini -> phi35_mini** (-0.029; 51 worse, 41 better; 15%), **granite30 -> granite31** (+0.014; 35 worse, 40 better; 12.5%) and **gemma2_2b -> gemma3_4b** (+0.032; 27 worse, 39 better; 11%). So a "neutral" verdict can hide that the new version fails on a different set of questions than the old one, in numbers far larger than the net change. **granite31 -> granite32** is the one stable upgrade (28 changed questions, 4.7%).
+
+**Big real changes:** qwen25 -> qwen3 under D (net -211, 45% churn: 240 got worse) and qwen2 -> qwen25 (net +93, 28% churn: 130 got better).
+
+**What kind of mistakes the new versions make most.** Over all 10 upgrades under D, the 607 "got worse" questions are: unparsed or broken output 298, fault-reporting wrong status 156, wrong or invalid arguments 148, wrong tool name 4, fabricated answer 1. But 234 of the 298 broken-output cases are qwen3 running out of tokens while thinking. Without qwen25 -> qwen3 the order is: **wrong status (155), wrong or invalid arguments (143), broken output (64)**. Choosing the wrong tool almost never happens, and so does making up an answer. Pair by pair: phi3 -> phi35 gets worse almost only on status reports (44 of 51), qwen2 -> qwen25 likewise (29 of 37), mistral_v01 -> v02 mostly on arguments (45 of 88) and broken output (24, for example an escaped `get\_weather` that makes the JSON invalid), llama3 -> llama31 on arguments (30) and status (19).
+
+**Does the Robust protocol change the mistakes?** For qwen25 -> qwen3, yes, a lot: "got worse" falls from 240 to 51 and broken output from 234 to 30, because R gives qwen3 more room and blocks its thinking (R is confounded for qwen3). For the other nine upgrades R changes little: the same kinds of mistakes in about the same numbers (all upgrades under R: wrong arguments 158, wrong status 157, broken output 73), and churn stays 5% to 28%. So R removes the thinking cut-off problem but not the ordinary version-to-version differences.
+
+## Notes and limits
+
+- **Majority rule:** right = passed in 6 or more of 10 trials. Questions where either model passed exactly 5 of 10 count as not right, which slightly favours "got better" when the old model ties and "got worse" when the new model ties: 190 of the 6,000 D questions and 161 of the R questions have such a tie in at least one model (a question can be counted under two upgrades).
+- **Greedy check:** using only the greedy trial gives the same picture with slightly lower counts: D 557 got worse and 488 got better in total (majority: 607 and 524), R 368 and 486 (majority: 395 and 527).
+- **Failure type:** the type that was most common among the new model's failing trials on that question. Schema-drift answers that fail several checks are put under the first of: unparsed, wrong tool name, wrong or invalid arguments. A reply that is valid JSON but in the wrong form (for example a number where text is required) counts as "unparsed/broken output".
+- **Files:** `EXPLORATORY_item_level_flips_summary.csv` (per protocol, upgrade, suite and basis) and `EXPLORATORY_item_level_flips_questions.csv` (12,000 rows, one per question and protocol).
+- **Caveat:** 600 questions per upgrade, not independent (the same tasks appear in both conditions, and a model belongs to two upgrades).
+
