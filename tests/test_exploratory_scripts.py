@@ -58,8 +58,27 @@ def test_a_scratch_folder_is_accepted_and_created(tmp_path):
 
 
 def test_static_paragraphs_exist():
-    for name in ("item_level_flips_tail", "wrong_calls_where_errors", "wrong_calls_more_summary", "threshold_correction", "s3_w3_moves_note", "s3_w3_caveats"):
+    for name in ("item_level_flips_tail", "wrong_calls_where_errors", "wrong_calls_more_summary", "threshold_correction", "s3_w3_moves_note", "s3_w3_caveats",
+                 "item_level_noise_summary", "wrong_calls_coverage_summary"):
         assert len(_common.static(name)) > 100
+
+
+def test_same_model_churn_counts_majority_and_greedy():
+    from scripts.exploratory._item_level_noise import _churn
+    right, wrong = (True, None), (False, "x")
+    # question q1: 6/10 vs 5/10 (right -> wrong by majority; greedy both right); q2: 0/10 vs 10/10 (wrong -> right both ways)
+    a = {"q1": {t: right if t < 6 else wrong for t in range(10)}, "q2": {t: wrong for t in range(10)}}
+    b = {"q1": {t: right if t < 5 else wrong for t in range(10)}, "q2": {t: right for t in range(10)}}
+    assert _churn(a, b, "majority") == (2, 1, 1)
+    assert _churn(a, b, "greedy") == (2, 0, 1)
+
+
+def test_wrong_call_kinds():
+    from scripts.exploratory.wrong_calls_coverage import kind
+    assert kind("neutral", "neutral") == "right"
+    assert kind("inconclusive", "harmful") == "inconclusive"
+    assert kind("harmful", "beneficial") == "serious"
+    assert kind("neutral", "beneficial") == "mild"
 
 
 # ---------------------------------------------------------------- run_all

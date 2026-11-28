@@ -24,7 +24,7 @@ from pathlib import Path
 from ._common import REPO_ROOT, check_out_dir
 
 ANALYSES = ["equivalence_bounds", "headline_cluster", "flip_vs_threshold", "r_vs_d_noise", "qwen3_dose", "pseudo_aa", "threshold_sensitivity",
-            "s1_headline_excl_qwen", "s3_w3_tasks", "task_level_comparison", "failure_examples", "item_level_flips", "flip_examples_full", "wrong_calls"]
+            "s1_headline_excl_qwen", "s3_w3_tasks", "task_level_comparison", "failure_examples", "item_level_flips", "flip_examples_full", "wrong_calls", "wrong_calls_coverage"]
 NUMBER = re.compile(r"[-+]?\d+(?:\.\d+)?")
 
 
