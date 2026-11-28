@@ -12,6 +12,7 @@ from vdanalysis.loader import record_score
 from vdanalysis.phase2.config import load_phase2_config
 from vdanalysis.phase2.merge import MergedStore
 from ._common import CONFIG, P7_DIR, parse_out, static
+from ._item_level_noise import section as noise_section
 
 
 def run(outdir):
@@ -98,6 +99,7 @@ def run(outdir):
 
     summary, qrows = [], []
     reasons = defaultdict(Counter)                 # (proto, pair) -> reason counts for 'got worse' (majority)
+    reasons_cond = defaultdict(Counter)            # (proto, pair, condition) -> the same, split by stress condition
     worse_examples = defaultdict(list)
     for proto in ("D", "R"):
         for name, old, new in pairs:
@@ -118,6 +120,7 @@ def run(outdir):
                         fails = Counter(r for ok, r in b[key].values() if not ok)
                         rs = fails.most_common(1)[0][0] if fails else "other"
                         reasons[(proto, name)][rs] += 1
+                        reasons_cond[(proto, name, key[1])][rs] += 1
                         if proto == "D" and a[key][0][0] is True and b[key][0][0] is False:
                             worse_examples[name].append((suite, key, rs))
                     qrows.append([proto, name, suite, key[0], key[1], f"{ra:.1f}", int(ma), f"{rb:.1f}", int(mb), cm, cg, rs])
@@ -189,10 +192,12 @@ def run(outdir):
             shown += 1
         md += "\n"
     md = md.rstrip("\n") + "\n\n" + static("item_level_flips_tail")
+    noise_md, noise_files = noise_section(OUT, cfg, load, pairs, summary, reasons_cond, REASONS)
+    md = md.rstrip("\n") + "\n" + noise_md
     (OUT / "EXPLORATORY_item_level_flips.md").write_text(md, encoding="utf-8")
     print("ok", len(qrows))
 
-    return ["EXPLORATORY_item_level_flips.md", "EXPLORATORY_item_level_flips_summary.csv", "EXPLORATORY_item_level_flips_questions.csv"]
+    return ["EXPLORATORY_item_level_flips.md", "EXPLORATORY_item_level_flips_summary.csv", "EXPLORATORY_item_level_flips_questions.csv"] + noise_files
 
 
 if __name__ == "__main__":
