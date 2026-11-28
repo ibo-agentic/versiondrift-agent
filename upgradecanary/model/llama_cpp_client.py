@@ -101,6 +101,18 @@ def missing_tool_names(rendered_prompt: str, tools: list[dict[str, Any]]) -> lis
     return [n for n in names if n and n not in rendered_prompt]
 
 
+def native_render_kwargs(thinking: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Keyword arguments for the native Jinja chat template. ``thinking`` != "default" sets
+    Qwen3's ``enable_thinking`` (PLAN.md F2, unchanged); ``extra`` (model.chat_template_kwargs,
+    opt-in, 2026-11-28) adds template variables such as Granite 3.2's thinking switch. With
+    thinking="default" and no extra kwargs this is {} -- exactly the previous rendering."""
+    kwargs: dict[str, Any] = {}
+    if thinking != "default":
+        kwargs["enable_thinking"] = thinking == "on"
+    kwargs.update(extra or {})
+    return kwargs
+
+
 def check_context_budget(prompt_token_count: int, max_tokens: int, n_ctx: int) -> None:
     """Raise a clear error if a record cannot possibly fit -- never let
     llama.cpp silently truncate the PROMPT to make room (2026-10-03
@@ -219,6 +231,14 @@ class LlamaCppClient:
         if thinking not in ("default", "on", "off"):
             raise ValueError(f"model.thinking must be 'default', 'on', or 'off', got {thinking!r}")
         self._thinking = thinking
+        # Opt-in (2026-11-28, exploratory Granite-thinking add-on): extra keyword arguments for
+        # the GGUF's own Jinja chat template, for templates whose thinking switch is not
+        # "enable_thinking" (e.g. a template that reads a "thinking" variable). Absent = {} =
+        # unchanged rendering and an unchanged backend_info / run manifest.
+        extra = model_cfg.get("chat_template_kwargs") or {}
+        if not isinstance(extra, dict):
+            raise ValueError(f"model.chat_template_kwargs must be a mapping, got {type(extra).__name__}")
+        self._chat_template_kwargs = dict(extra)
         # Sampling params not exposed in configs (library defaults apply);
         # read back here so run_manifest.json can log what was actually in
         # effect (2026-10-02 audit follow-up, item 4).
@@ -253,6 +273,7 @@ class LlamaCppClient:
             "chat_wrapping": self._chat_wrapping,
             "native_chat_template_found": self._native_formatter is not None,
             "thinking": self._thinking,
+            **({"chat_template_kwargs": dict(self._chat_template_kwargs)} if self._chat_template_kwargs else {}),
             # Checks 1-2 from the 2026-10-03 native-wrapping review: what was
             # actually resolved for BOS handling and stop tokens, logged so a
             # run_manifest.json reader never has to re-derive this from the
@@ -326,9 +347,7 @@ class LlamaCppClient:
     ) -> str:
         stop = self._stop
         if self._chat_wrapping == "native":
-            render_kwargs: dict[str, Any] = {}
-            if self._thinking != "default":
-                render_kwargs["enable_thinking"] = self._thinking == "on"
+            render_kwargs = native_render_kwargs(self._thinking, self._chat_template_kwargs)
             rendered = self._native_formatter(
                 messages=[{"role": "user", "content": prompt}],
                 tools=tools,

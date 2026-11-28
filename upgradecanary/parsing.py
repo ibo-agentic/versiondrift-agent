@@ -31,6 +31,35 @@ _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 _VALID_ESCAPES = set('"\\/bfnrtu')
 
 
+# Opt-in thinking policy (2026-11-28, exploratory Granite-thinking add-on; see
+# analysis/exploratory/EXPLORATORY_PLAN_granite_thinking.md). Default None = unchanged
+# behavior, so no existing config or result is affected. "strict": for each known thinking
+# format whose opening marker occurs in the output, completed thinking (closing marker
+# present) is removed -- only the text after the LAST closing marker is scanned -- and
+# cut-off thinking (opening marker without a closing marker) leaves nothing to scan, so the
+# record is unparsed. Markers: Qwen3's <think>...</think> tags and Granite 3.2's
+# "Here is my thought process:" ... "Here is my response:" sections.
+THINKING_FORMATS = (
+    ("<think>", "</think>"),
+    ("Here is my thought process:", "Here is my response:"),
+)
+THINKING_POLICIES = (None, "strict")
+
+
+def apply_thinking_policy(raw: str, policy: str | None) -> str:
+    """See THINKING_FORMATS. ``policy=None`` returns ``raw`` unchanged."""
+    if policy is None:
+        return raw
+    if policy != "strict":
+        raise ValueError(f"thinking policy must be one of {THINKING_POLICIES}, got {policy!r}")
+    for opening, closing in THINKING_FORMATS:
+        if opening in raw:
+            if closing not in raw:
+                return ""
+            return raw[raw.rindex(closing) + len(closing):]
+    return raw
+
+
 def strip_think_block(raw: str) -> str:
     """Remove a complete <think>...</think> block, if present. Leaves a
     truncated (unclosed) block untouched."""
@@ -61,6 +90,7 @@ def extract_tool_call(
     *,
     strip_think: bool = False,
     lenient: bool = False,
+    thinking_policy: str | None = None,
 ) -> dict[str, Any] | None:
     """Return {"name": str, "arguments": dict} or None if unparseable.
 
@@ -70,7 +100,8 @@ def extract_tool_call(
     detection/logging variant (PLAN.md F3 follow-up, 2026-10-04); this
     function is a thin wrapper that discards the format label.
     """
-    call, _format_name = extract_tool_call_with_format(raw, strip_think=strip_think, lenient=lenient)
+    call, _format_name = extract_tool_call_with_format(raw, strip_think=strip_think, lenient=lenient,
+                                                       thinking_policy=thinking_policy)
     return call
 
 
@@ -110,6 +141,7 @@ def extract_tool_call_with_format(
     *,
     strip_think: bool = False,
     lenient: bool = False,
+    thinking_policy: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Like ``extract_tool_call``, but also returns which format was
     detected: one of the four tagged native formats
@@ -123,7 +155,8 @@ def extract_tool_call_with_format(
     detected -- a detected tag with unparseable content inside it is still
     reported, since that's diagnostically useful, but the call is None).
     """
-    text = strip_think_block(raw) if strip_think else raw
+    text = apply_thinking_policy(raw, thinking_policy)
+    text = strip_think_block(text) if strip_think else text
     detected_tag = _detect_native_format(text)
     call, shape = _extract_with_shape(text)
     if call is None and lenient:
@@ -203,6 +236,7 @@ def extract_fault_report(
     *,
     strip_think: bool = False,
     lenient: bool = False,
+    thinking_policy: str | None = None,
 ) -> dict[str, Any] | None:
     """PLAN.md's fault_reporting condition: extract
     ``{"status": "ok"|"failed"|"incomplete", "answer": <string or null>}``
@@ -223,7 +257,8 @@ def extract_fault_report(
     documented keys (``status``, ``answer``) are unchanged; this is an
     additive third key, not a behavior change to either of them.
     """
-    text = strip_think_block(raw) if strip_think else raw
+    text = apply_thinking_policy(raw, thinking_policy)
+    text = strip_think_block(text) if strip_think else text
     report = _extract_fault_report(text)
     if report is not None or not lenient:
         return report

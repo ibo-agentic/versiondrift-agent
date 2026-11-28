@@ -30,7 +30,7 @@ from .bfcl import to_native_doc
 from .constrained import response_schema_for, schema_to_openai_tool
 from .evaluator import evaluate, evaluate_fault_reporting, summarize
 from .model import create_client
-from .parsing import extract_fault_report, extract_tool_call_with_format
+from .parsing import THINKING_POLICIES, extract_fault_report, extract_tool_call_with_format
 from .perturbations.runtime_faults import Fault, choose as choose_fault
 from .perturbations.runtime_faults import choose_with_ok as choose_fault_with_ok
 from .perturbations.runtime_faults import is_retryable
@@ -320,6 +320,10 @@ def run(config_path: str) -> dict[str, Any]:
     # "parsing" key, so extract_tool_call behavior is unchanged unless a
     # config explicitly opts in (2026-10-02 audit follow-up, item 2).
     strip_think = bool(cfg.get("parsing", {}).get("strip_think_block", False))
+    # Opt-in (2026-11-28, exploratory Granite-thinking add-on): absent key = None = unchanged.
+    thinking_policy = cfg.get("parsing", {}).get("thinking_policy")
+    if thinking_policy not in THINKING_POLICIES:
+        raise ValueError(f"parsing.thinking_policy must be one of {THINKING_POLICIES}, got {thinking_policy!r}")
     # PLAN.md F3/F4. Both default to the exact pre-existing behavior
     # ("shared" prompt text, no constrained decoding) when the keys are
     # absent, so every existing config is unaffected.
@@ -391,7 +395,7 @@ def run(config_path: str) -> dict[str, Any]:
                     truncated = (
                         client.last_truncated() if hasattr(client, "last_truncated") else None
                     )
-                    parsed_report = extract_fault_report(raw, strip_think=strip_think)
+                    parsed_report = extract_fault_report(raw, strip_think=strip_think, thinking_policy=thinking_policy)
                     metrics = evaluate_fault_reporting(parsed_report, fault)
                     raw_rows.append(
                         {
@@ -433,7 +437,7 @@ def run(config_path: str) -> dict[str, Any]:
                 truncated = (
                     client.last_truncated() if hasattr(client, "last_truncated") else None
                 )
-                parsed, detected_format = extract_tool_call_with_format(raw, strip_think=strip_think)
+                parsed, detected_format = extract_tool_call_with_format(raw, strip_think=strip_think, thinking_policy=thinking_policy)
                 exec_result = _safe_execute(
                     parsed, schema, drift, fault, strict, canonical_schema=base_schema
                 )
@@ -469,7 +473,7 @@ def run(config_path: str) -> dict[str, Any]:
                         client.last_truncated() if hasattr(client, "last_truncated") else None
                     )
                     retry_parsed, retry_detected_format = extract_tool_call_with_format(
-                        retry_raw, strip_think=strip_think
+                        retry_raw, strip_think=strip_think, thinking_policy=thinking_policy
                     )
                     retry_exec = _safe_execute(
                         retry_parsed, schema, drift, None, strict,
