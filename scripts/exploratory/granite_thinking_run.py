@@ -3,6 +3,7 @@
     python -m scripts.exploratory.granite_thinking_run --arm pilot            # 5 tasks per suite, 1 trial (greedy), 256 tokens
     python -m scripts.exploratory.granite_thinking_run --arm think256         # 10 trials, 256 tokens  (full plan; not run yet)
     python -m scripts.exploratory.granite_thinking_run --arm think1024        # 10 trials, 1024 tokens (full plan; not run yet)
+    python -m scripts.exploratory.granite_thinking_run --arm think256 --trials 3   # the plan's first step: trials 0-2 only
     python -m scripts.exploratory.granite_thinking_run --arm pilot --configs-only
 
 Each config is the main study's D config of granite32 for that suite (results_v3/_generated_configs/D__granite32__<suite>.yaml, which
@@ -32,11 +33,14 @@ ARMS = {
 }
 
 
-def build_config(arm: str, suite: str) -> dict:
+def build_config(arm: str, suite: str, trials: int | None = None) -> dict:
+    """``trials`` (optional) runs only the first N trials of the arm: the same seeds and temperatures as its first N trials."""
     spec = ARMS[arm]
     base = yaml.safe_load((REPO_ROOT / "results_v3" / "_generated_configs" / f"D__granite32__{suite}.yaml").read_text(encoding="utf-8"))
     cfg = copy.deepcopy(base)
-    n = spec["trials"]
+    n = spec["trials"] if trials is None else trials
+    if not 1 <= n <= spec["trials"]:
+        raise ValueError(f"--trials must be between 1 and {spec['trials']} for arm {arm}")
     cfg["experiment"] = f"exploratory-granite32-thinking-{arm}-{suite}"
     cfg["output_dir"] = str((OUT_ROOT / arm / suite).relative_to(REPO_ROOT)).replace("\\", "/")
     cfg["conditions"] = ["schema_drift", "fault_reporting"]
@@ -56,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--arm", required=True, choices=sorted(ARMS))
     ap.add_argument("--suites", nargs="*", default=list(SUITES))
+    ap.add_argument("--trials", type=int, default=None, help="run only the first N trials of the arm (same seeds and temperatures)")
     ap.add_argument("--configs-only", action="store_true")
     args = ap.parse_args(argv)
     cfg_dir = OUT_ROOT / "_configs"
@@ -63,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     paths = []
     for suite in args.suites:
         p = cfg_dir / f"{args.arm}__{suite}.yaml"
-        p.write_text(yaml.safe_dump(build_config(args.arm, suite), sort_keys=False), encoding="utf-8")
+        p.write_text(yaml.safe_dump(build_config(args.arm, suite, args.trials), sort_keys=False), encoding="utf-8")
         paths.append(p)
         print("config", p.relative_to(REPO_ROOT))
     if args.configs_only:
